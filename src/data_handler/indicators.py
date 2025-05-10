@@ -1,9 +1,11 @@
 # File: indicators.py
+# 기술적 지표 계산용 파일
 
 import pandas as pd
 import numpy as np
 
 # --- Indicator implementations using pandas/numpy ---
+
 
 def ema(series: pd.Series, period: int) -> pd.Series:
     """
