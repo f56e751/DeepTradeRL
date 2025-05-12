@@ -12,7 +12,7 @@ class Kiwoom(QAxWidget):
         super().__init__()
         self._create_kiwoom_instance()
         self._set_signal_slots()
-        self.ohlcv = {'date': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': []}
+        self.ohlcv = {'date': [], 'ticker': [], 'open': [], 'high': [], 'low': [], 'close': [], 'adj_close': [], 'volume': []}
 
     def _create_kiwoom_instance(self):
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
@@ -103,10 +103,12 @@ class Kiwoom(QAxWidget):
             # 가격이 모두 0이 아닌 경우만 추가 (잘못된 데이터 필터링)
             if open_val > 0 and high_val > 0 and low_val > 0 and close_val > 0:
                 self.ohlcv['date'].append(date.strip())
+                self.ohlcv['ticker'].append(self.current_code)  # 현재 조회 중인 종목코드 추가
                 self.ohlcv['open'].append(open_val)
                 self.ohlcv['high'].append(high_val)
                 self.ohlcv['low'].append(low_val)
                 self.ohlcv['close'].append(close_val)
+                self.ohlcv['adj_close'].append(close_val)  # 수정주가구분=1이므로 close가 이미 수정종가
                 self.ohlcv['volume'].append(volume_val)
             else:
                 print(f"잘못된 데이터 스킵: {date.strip()} O:{open_val} H:{high_val} L:{low_val} C:{close_val}")
@@ -121,7 +123,8 @@ class Kiwoom(QAxWidget):
         :return: DataFrame
         """
         print(f"데이터 요청 시작: {code}, 분봉:{tick_range}분")
-        self.ohlcv = {'date': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': []}
+        self.current_code = code  # 현재 조회 중인 종목코드 저장
+        self.ohlcv = {'date': [], 'ticker': [], 'open': [], 'high': [], 'low': [], 'close': [], 'adj_close': [], 'volume': []}
         
         self.set_input_value("종목코드", code)
         self.set_input_value("틱범위", str(tick_range))
@@ -165,8 +168,8 @@ class Kiwoom(QAxWidget):
             print("데이터가 없습니다.")
             return pd.DataFrame()
         
-        # 데이터 프레임으로 변환
-        df = pd.DataFrame(self.ohlcv, columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+        # 데이터 프레임으로 변환 (Date, Ticker, Open, High, Low, Close, Adj Close, Volume 순서)
+        df = pd.DataFrame(self.ohlcv, columns=['date', 'ticker', 'open', 'high', 'low', 'close', 'adj_close', 'volume'])
         
         # 날짜 형식 변환
         df['date'] = pd.to_datetime(df['date'], format='%Y%m%d%H%M%S')
@@ -275,20 +278,30 @@ if __name__ == "__main__":
             db_dir = Path(__file__).parent.parent / "db"
             db_dir.mkdir(exist_ok=True)
             
-            # date 컬럼을 보기 좋은 형식으로 변환
+            # date 컬럼을 보기 좋은 형식으로 변환하고 컬럼명을 대문자로 변경
             samsung_data_copy = samsung_data.copy()
-            samsung_data_copy['date'] = samsung_data_copy['date'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            samsung_data_copy['Date'] = samsung_data_copy['date'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            samsung_data_copy['Ticker'] = samsung_data_copy['ticker']
+            samsung_data_copy['Open'] = samsung_data_copy['open']
+            samsung_data_copy['High'] = samsung_data_copy['high']
+            samsung_data_copy['Low'] = samsung_data_copy['low']
+            samsung_data_copy['Close'] = samsung_data_copy['close']
+            samsung_data_copy['Adj Close'] = samsung_data_copy['adj_close']
+            samsung_data_copy['Volume'] = samsung_data_copy['volume']
+            
+            # 최종 저장용 DataFrame 생성 (Date, Ticker, Open, High, Low, Close, Adj Close, Volume 순서)
+            final_df = samsung_data_copy[['Date', 'Ticker', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']]
             
             # 파일명 설정
             output_path = db_dir / f"samsung_1min_{start_date}_{end_date}.csv"
             
-            samsung_data_copy.to_csv(output_path, index=False)
+            final_df.to_csv(output_path, index=False)
             print(f"\n데이터 저장 완료: {output_path}")
             print(f"파일 크기: {output_path.stat().st_size / (1024*1024):.2f} MB")
             
             # 샘플 데이터 확인
             print(f"\n저장된 데이터 샘플:")
-            print(samsung_data_copy.head())
+            print(final_df.head())
         else:
             print("데이터를 가져오지 못했습니다.")
             print("키움 API 제한으로 인해 해당 기간의 데이터를 가져올 수 없을 수 있습니다.")
