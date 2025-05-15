@@ -233,7 +233,7 @@ class TickDataHandlerBase(DataHandlerBase):
     def get_observation(self, step: int, position: int, **kwargs) -> np.ndarray:
         features = self.get_additional_features(step, position, **kwargs)
         return np.array(features, dtype=np.float32)
-
+    
 class Sc201Handler(TickDataHandlerBase):
     """
     Sc201: 호가 10단계 + 직전 lookback 틱 LOB 스냅샷(부족분 0 패딩) + 현재 포지션
@@ -243,22 +243,30 @@ class Sc201Handler(TickDataHandlerBase):
     0 → 중립(Flat)
     -1 → 숏(Short)
     """
-    def get_additional_features(self, step: int, position: int, **kwargs) -> list:
-        # 1) 현재 호가 잔량
-        row = self.df.loc[step]
-        lob = row[:self.lob_levels*2].tolist()
+    def __init__(self, df, lob_levels=10, lookback=9, price_cols=20):
+        super().__init__(df, lob_levels, lookback)
+        # price_cols = 2*lob_levels  (px 컬럼 개수)
+        self.price_cols = price_cols
 
-        # 2) 과거 lookback 틱의 스냅샷, 부족분은 0으로 채움
+    def get_additional_features(self, step, position, **kwargs):
+        row = self.df.iloc[step]
+
+        # 1) 현재 잔량: price_cols 위치 다음부터 2*lob_levels개
+        start = self.price_cols
+        end = start + self.lob_levels*2
+        lob = row.iloc[start:end].tolist()
+
+        # 2) 과거 lookback 스냅샷
         snapshots = []
-        for t in range(step - self.lookback + 1, step + 1):
+        for t in range(step - self.lookback, step):
             if t < 0:
-                # t < 0 이면 해당 틱정보가 없으므로 0으로 패딩
-                snapshots.extend([0.0] * (self.lob_levels * 2))
+                snapshots.extend([0.0] * (self.lob_levels*2))
             else:
-                snapshots.extend(self.df.loc[t, :self.lob_levels*2].tolist())
+                snapshots.extend(self.df.iloc[t, start:end].tolist())
 
         # 3) 현재 포지션
-        return lob + snapshots + [position]
+        return snapshots + lob + [position]
+
 
 class Sc202Handler(Sc201Handler):
     """
@@ -280,10 +288,10 @@ class Sc203Handler(Sc202Handler):
             best_bid = row.iloc[0]    # bid_1
             best_ask = row.iloc[3]    # ask_1
         """
-        row = self.df.loc[step]
-        best_bid = row.iloc[0]
-        best_ask = row.iloc[self.lob_levels]
-        return best_ask - best_bid
+        bid = self.df.loc[step, 'bid_px_00']
+        ask = self.df.loc[step, 'ask_px_00']
+        spread = ask - bid
+        return spread
     
     def get_additional_features(self, step: int, position: int, pnl: float = 0.0, **kwargs) -> list:
         # Sc202까지의 features (lob, snapshots, position, pnl)

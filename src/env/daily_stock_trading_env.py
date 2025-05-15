@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from src.env.inventory import Inventory
 from src.data_handler.data_handler import MultiDataHandler
+from src.env.transaction_info import TransactionInfo
 
 class DailyStockTradingEnv(gym.Env):
     """
@@ -99,12 +100,14 @@ class DailyStockTradingEnv(gym.Env):
             qty   = real_act[i]
             price = prices[i]
             if qty < 0:
-                sold = self.inventory.sell(ticker, abs(qty), price)
+                transaction_info: TransactionInfo = self.inventory.sell(ticker, abs(qty), price)
+                sold = transaction_info.quantity
                 fee  = sold * price * self.transaction_fee
                 self.inventory.cash -= fee
                 executed_sells[i] = sold
             elif qty > 0:
-                bought = self.inventory.buy(ticker, qty, price)
+                transaction_info: TransactionInfo = self.inventory.buy(ticker, qty, price)
+                bought = transaction_info.quantity
                 fee    = bought * price * self.transaction_fee
                 self.inventory.cash -= fee
                 executed_buys[i] = bought

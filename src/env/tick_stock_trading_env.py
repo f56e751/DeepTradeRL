@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from src.env.inventory import Inventory
 from src.data_handler.data_handler import Sc201Handler, Sc202Handler, Sc203Handler, TickDataHandlerBase
+from src.env.transaction_info import TransactionInfo
 
 # Inventory, TickDataHandlerBase, Sc201Handler, Sc202Handler, Sc203Handler 클래스가 같은 스코프에 있어야 합니다.
 class TickStockTradingEnv(gym.Env):
@@ -14,6 +15,7 @@ class TickStockTradingEnv(gym.Env):
     - 매수: 최우선 매도호가(best ask)로 1주 매수
     - 매도: 최우선 매수호가(best bid)로 1주 매도
     - 일일 손절: 보유 전량을 최우선 매수호가로 청산
+    - transaction_fee: 거래 시 부과되는 비율 (예: 0.001 = 0.1%)
 
     TODO 수량에 따라 일일손절을 단일 가격이 아니라 여러 가격으로 나눠서 할 수 있게 수정
 
@@ -37,6 +39,7 @@ class TickStockTradingEnv(gym.Env):
         lob_levels: int = 10,
         lookback: int = 9,
         ticker: str = "TICKER",
+        transaction_fee: float = 0.0023,
     ):
         super().__init__()
         self.df = df.reset_index(drop=True)
@@ -52,6 +55,7 @@ class TickStockTradingEnv(gym.Env):
             low=-np.inf, high=np.inf,
             shape=sample_obs.shape, dtype=np.float32,
         )
+        self.transaction_fee = transaction_fee
 
     def reset(self):
         """환경 초기화 후 초기 obs 반환"""
@@ -60,13 +64,26 @@ class TickStockTradingEnv(gym.Env):
         return self._get_obs()
 
     def _get_best_bid(self) -> float:
-        return float(self.df.loc[self.current_step].iloc[0])
+        """
+        최우선 매수호가 가격(best bid price) 반환
+        df 컬럼명: 'bid_px_00'
+        """
+        return float(self.df.loc[self.current_step, 'bid_px_00'])
 
     def _get_best_ask(self) -> float:
-        return float(self.df.loc[self.current_step].iloc[self.handler.lob_levels])
+        """
+        최우선 매도호가 가격(best ask price) 반환
+        df 컬럼명: 'ask_px_00'
+        """
+        return float(self.df.loc[self.current_step, 'ask_px_00'])
 
     def _get_mid_price(self) -> float:
-        return (self._get_best_bid() + self._get_best_ask()) / 2
+        """
+        mid price 계산: (best bid + best ask) / 2
+        """
+        bid = self._get_best_bid()
+        ask = self._get_best_ask()
+        return (bid + ask) / 2
 
     def _get_obs(self) -> np.ndarray:
         pos = np.sign(self.inventory.get_position(self.ticker))
@@ -81,40 +98,52 @@ class TickStockTradingEnv(gym.Env):
         액션 실행 및 보상 계산
         - 0=매도, 2=매수, 3=일일 손절, 1=대기
         - 보상: 포지션 청산 시 realized PnL 반환
-        - 현금/주식 부족 시 해당 액션은 no-op 처리
+        - 현금/주식 부족 시 해당 액션은 no-op 처리, invalid flag 반환
         """
         done = False
         reward = 0.0
+        invalid = False
 
         # 0=매도
         if action == 0:
-            # 보유 주식이 있을 때만 매도
             if self.inventory.can_sell(self.ticker, 1):
                 price = self._get_best_bid()
-                reward = self.inventory.sell(self.ticker, qty=1, price=price)
+                transactionInfo: TransactionInfo = self.inventory.sell(self.ticker, qty=1, price=price)
+                pnl = transactionInfo.realized_pnl
+                fee = price * 1 * self.transaction_fee
+                reward = pnl - fee
             else:
-                # 보유 주식 없으면 no-op
-                reward = 0.0
+                # 보유 주식 없으면 invalid
+                invalid = True
+
         # 2=매수
         elif action == 2:
             price = self._get_best_ask()
-            # 충분한 현금 있을 때만 매수
-            if self.inventory.can_buy(self.ticker, 1, price):
-                self.inventory.buy(self.ticker, qty=1, price=price)
+            qty = 1
+            fee = price * qty * self.transaction_fee
+            if self.inventory.can_buy(self.ticker, 1, price, fee):
+                transactionInfo: TransactionInfo = self.inventory.buy(self.ticker, qty=1, price=price)
+                # 매수 시에도 수수료 부과 (현금에서 추가 차감)
+                
+                self.inventory.cash -= fee
             else:
-                # 현금 부족 시 no-op
-                pass
+                # 현금 부족 시 invalid
+                invalid = True
+
         # 3=일일 손절
         elif action == 3:
             qty = self.inventory.get_position(self.ticker)
-            # 보유 주식이 있을 때만 전량 청산
             if qty > 0:
                 price = self._get_best_bid()
-                reward = self.inventory.sell(self.ticker, qty=qty, price=price)
+                transactionInfo: TransactionInfo = self.inventory.sell(self.ticker, qty=qty, price=price)
+                pnl = transactionInfo.realized_pnl
+                fee = price * qty * self.transaction_fee
+                reward = pnl - fee
             else:
-                # 보유 주식 없으면 no-op
-                pass
-        # 1=대기: no-op
+                # 보유 주식 없으면 invalid
+                invalid = True
+
+        # 1=대기: 항상 valid no-op
 
         # 스텝 진행 및 종료 여부 판단
         self.current_step += 1
@@ -123,10 +152,12 @@ class TickStockTradingEnv(gym.Env):
 
         obs = self._get_obs()
         info = {
+            "invalid": invalid,
             "cash": self.inventory.get_cash(),
             "position": self.inventory.get_position(self.ticker),
         }
         return obs, float(reward), done, info
+
 
     def render(self, mode="human"):
         bid = self._get_best_bid()
