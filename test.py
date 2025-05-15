@@ -3,7 +3,7 @@
 import pandas as pd
 from src.data_handler.csv_folder_loader import CSVFolderLoader
 from src.data_handler.data_handler import MultiDataHandler
-from src.env.stock_trading_env import StockTradingEnv
+from src.env.daily_stock_trading_env import DailyStockTradingEnv
 
 
 def test_data_handler(folder_path: str, obs_step: int = 0):
@@ -42,7 +42,7 @@ def test_env(df: pd.DataFrame, n_steps: int = 10):
     """
     print("\n--- Testing StockTradingEnv ---")
     # 환경 생성 (기본 h_max=10, transaction_fee=0.001)
-    env = StockTradingEnv(df=df, wanted_features = ['Adj Close', 'MACD', 'RSI', 'CCI', 'ADX'])
+    env = DailyStockTradingEnv(df=df, wanted_features = ['Adj Close', 'MACD', 'RSI', 'CCI', 'ADX'])
 
     # 환경 초기화 및 첫 관측값 확인
     obs = env.reset()

@@ -5,7 +5,7 @@ import pandas as pd
 from src.env.inventory import Inventory
 from src.data_handler.data_handler import MultiDataHandler
 
-class StockTradingEnv(gym.Env):
+class DailyStockTradingEnv(gym.Env):
     """
     연속형 다중 종목 거래 환경 (MultiDataHandler + Inventory 사용):
       - df로부터 MultiDataHandler로 가격 및 기술 지표 데이터를 관리
