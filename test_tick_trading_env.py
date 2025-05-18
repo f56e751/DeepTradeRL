@@ -1,6 +1,6 @@
 from src.env.tick_stock_trading_env import TickStockTradingEnv
 from src.data_handler.data_handler import Sc201Handler, Sc202Handler, Sc203Handler
-from src.data_handler.lob_csv_processor import LOBCSVProcessor
+from data_handler.csv_processor import LOBCSVProcessor
 import pandas as pd
 import numpy as np
 from io import StringIO

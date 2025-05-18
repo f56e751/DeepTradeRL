@@ -300,6 +300,172 @@ class Sc203Handler(Sc202Handler):
         spread = self.calculate_spread(step)
         return base + [spread]
 
+
+
+
+
+
+class Sc201OHLCVHandler(TickDataHandlerBase):
+    """
+    Sc201 + OHLCV
+    - 호가 10단계
+    - lookback 틱 LOB 스냅샷 (부족분 0 패딩)
+    - 현재 포지션
+    - OHLCV (open, high, low, close, volume)
+    """
+    def __init__(self, df, lob_levels=10, lookback=9):
+        super().__init__(df, lob_levels, lookback)
+
+    def get_additional_features(self, step: int, position: int, **kwargs) -> list:
+        row = self.df.iloc[step]
+
+        # — 1) 현재 호가 스냅샷 (bid_px, ask_px)
+        lob_px = [row[f"bid_px_{i:02d}"] for i in range(self.lob_levels)] + \
+                 [row[f"ask_px_{i:02d}"] for i in range(self.lob_levels)]
+
+        # — 2) 과거 lookback 스냅샷
+        snapshots = []
+        for t in range(step - self.lookback, step):
+            if t < 0:
+                snapshots.extend([0.0] * (2 * self.lob_levels))
+            else:
+                prev = self.df.iloc[t]
+                snapshots.extend(
+                    [prev[f"bid_px_{i:02d}"] for i in range(self.lob_levels)] +
+                    [prev[f"ask_px_{i:02d}"] for i in range(self.lob_levels)]
+                )
+
+        # — 3) 현재 포지션
+        features = snapshots + lob_px + [position]
+
+        # — 4) OHLCV
+        features += [
+            row["open"],
+            row["high"],
+            row["low"],
+            row["close"],
+            row["volume"],
+        ]
+
+        return features
+
+
+
+class Sc202OHLCVHandler(TickDataHandlerBase):
+    """
+    Sc202 + OHLCV
+    Sc201OHLCVHandler 에 미실현 P&L 추가
+    """
+    def __init__(self, df, lob_levels=10, lookback=9):
+        super().__init__(df, lob_levels, lookback)
+
+    def get_additional_features(
+        self,
+        step: int,
+        position: int,
+        pnl: float = 0.0,
+        **kwargs
+    ) -> list:
+        row = self.df.iloc[step]
+
+        # 1) LOB + lookback + position
+        lob_px = [row[f"bid_px_{i:02d}"] for i in range(self.lob_levels)] + \
+                 [row[f"ask_px_{i:02d}"] for i in range(self.lob_levels)]
+        snapshots = []
+        for t in range(step - self.lookback, step):
+            if t < 0:
+                snapshots.extend([0.0] * (2 * self.lob_levels))
+            else:
+                prev = self.df.iloc[t]
+                snapshots.extend(
+                    [prev[f"bid_px_{i:02d}"] for i in range(self.lob_levels)] +
+                    [prev[f"ask_px_{i:02d}"] for i in range(self.lob_levels)]
+                )
+        features = snapshots + lob_px + [position]
+
+        # 2) 미실현 P&L
+        features.append(pnl)
+
+        # 3) OHLCV
+        features += [
+            row["open"],
+            row["high"],
+            row["low"],
+            row["close"],
+            row["volume"],
+        ]
+
+        return features
+
+
+
+class Sc203OHLCVHandler(TickDataHandlerBase):
+    """
+    Sc203 + OHLCV
+    Sc202OHLCVHandler 에 bid-ask 스프레드 추가
+    """
+    def __init__(self, df, lob_levels=10, lookback=9):
+        super().__init__(df, lob_levels, lookback)
+
+    def get_additional_features(
+        self,
+        step: int,
+        position: int,
+        pnl: float = 0.0,
+        **kwargs
+    ) -> list:
+        row = self.df.iloc[step]
+
+        # 1) LOB + lookback + position + pnl
+        lob_px = [row[f"bid_px_{i:02d}"] for i in range(self.lob_levels)] + \
+                 [row[f"ask_px_{i:02d}"] for i in range(self.lob_levels)]
+        snapshots = []
+        for t in range(step - self.lookback, step):
+            if t < 0:
+                snapshots.extend([0.0] * (2 * self.lob_levels))
+            else:
+                prev = self.df.iloc[t]
+                snapshots.extend(
+                    [prev[f"bid_px_{i:02d}"] for i in range(self.lob_levels)] +
+                    [prev[f"ask_px_{i:02d}"] for i in range(self.lob_levels)]
+                )
+        features = snapshots + lob_px + [position, pnl]
+
+        # 2) 스프레드 (best ask - best bid)
+        spread = row["ask_px_00"] - row["bid_px_00"]
+        features.append(spread)
+
+        # 3) OHLCV
+        features += [
+            row["open"],
+            row["high"],
+            row["low"],
+            row["close"],
+            row["volume"],
+        ]
+
+        return features
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def create_data_handler(
     handler_type: HandlerType,
     df: pd.DataFrame,
