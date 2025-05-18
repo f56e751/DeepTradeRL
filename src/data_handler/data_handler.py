@@ -18,7 +18,6 @@ class MinuteVersion(Enum):
 
 
 # --- Handlers ---
-
 class DataHandlerBase(ABC):
     """
     추상 기본 클래스: DataHandler 인터페이스 정의
@@ -176,10 +175,49 @@ class MultiDataHandler:
             obs_parts.append(obs_t)
         return np.concatenate(obs_parts, axis=0)
 
+# ====================================================
+# MinuteDataHandlerBase 입력 df 설명
+
+# 예: lob_levels=3, lookback=2 라고 가정
+# 컬럼 0~2: 매수 레벨 1~3 잔량
+# 컬럼 3~5: 매도 레벨 1~3 잔량
+
+# 컬럼 순서: [bid_1, bid_2, bid_3, ask_1, ask_2, ask_3]  
+# – bid_1 은 최우선 매수호가(best bid)
+# – ask_1 은 최우선 매도호가(best ask)
+
+
+# 예시 데이터 (잔량@가격):
+#   bid_1 = 500@100원   ← 최우선 매수호가: 100원에 500주 매수 대기
+#   bid_2 = 300@ 99원   ← 2차 매수호가:   99원에 300주 매수 대기
+#   bid_3 = 200@ 98원   ← 3차 매수호가:   98원에 200주 매수 대기
+#   ask_1 = 600@101원   ← 최우선 매도호가: 101원에 600주 매도 대기
+#   ask_2 = 400@102원   ← 2차 매도호가:   102원에 400주 매도 대기
+#   ask_3 = 250@103원   ← 3차 매도호가:   103원에 250주 매도 대기
+#
+# 따라서 spread = ask_1 가격 − bid_1 가격 = 101원 − 100원 = 1원
 
 
 
-class MinuteDataHandlerBase(DataHandlerBase):
+# 행: n step에서의 잔량
+# 열: 매수, 매도 호가
+
+# df 모습
+#    0   1   2   3   4   5
+#0  23  45  12  78  34  56
+#1  10  67  89  23  11   9
+#2  54  33  21  45  66  72
+#3  19  28  37  46  55  64
+#4   5  15  25  35  45  55
+
+
+# 이 df를 Sc201Handler에 넘기면,
+# step=2일 때 get_observation(2, position=1) 은
+#   - 컬럼 0~5 의 현재 잔량 (6개)
+#   - 과거 2틱(lookback=2)이면 step=1,2의 잔량 (2×6=12개)
+#   - position (1개)
+# 총 6 + 12 + 1 = 19 차원 벡터를 반환합니다.
+class TickDataHandlerBase(DataHandlerBase):
     """
     분 단위 거래용 공통 처리기
     """
@@ -195,19 +233,40 @@ class MinuteDataHandlerBase(DataHandlerBase):
     def get_observation(self, step: int, position: int, **kwargs) -> np.ndarray:
         features = self.get_additional_features(step, position, **kwargs)
         return np.array(features, dtype=np.float32)
+    
+class Sc201Handler(TickDataHandlerBase):
+    """
+    Sc201: 호가 10단계 + 직전 lookback 틱 LOB 스냅샷(부족분 0 패딩) + 현재 포지션
+    
+    현재 포지션
+    +1 → 롱(Long) 포지션
+    0 → 중립(Flat)
+    -1 → 숏(Short)
+    """
+    def __init__(self, df, lob_levels=10, lookback=9, price_cols=20):
+        super().__init__(df, lob_levels, lookback)
+        # price_cols = 2*lob_levels  (px 컬럼 개수)
+        self.price_cols = price_cols
 
-class Sc201Handler(MinuteDataHandlerBase):
-    """
-    Sc201: 호가 10단계 + 직전 9틱 LOB 스냅샷 + 현재 포지션
-    """
-    def get_additional_features(self, step: int, position: int, **kwargs) -> list:
-        row = self.df.loc[step]
-        lob = row[:self.lob_levels*2].tolist()
+    def get_additional_features(self, step, position, **kwargs):
+        row = self.df.iloc[step]
+
+        # 1) 현재 잔량: price_cols 위치 다음부터 2*lob_levels개
+        start = self.price_cols
+        end = start + self.lob_levels*2
+        lob = row.iloc[start:end].tolist()
+
+        # 2) 과거 lookback 스냅샷
         snapshots = []
-        for t in range(step-self.lookback+1, step+1):
-            if t < 0: continue
-            snapshots.extend(self.df.loc[t, :self.lob_levels*2].tolist())
-        return lob + snapshots + [position]
+        for t in range(step - self.lookback, step):
+            if t < 0:
+                snapshots.extend([0.0] * (self.lob_levels*2))
+            else:
+                snapshots.extend(self.df.iloc[t, start:end].tolist())
+
+        # 3) 현재 포지션
+        return snapshots + lob + [position]
+
 
 class Sc202Handler(Sc201Handler):
     """
@@ -219,10 +278,26 @@ class Sc202Handler(Sc201Handler):
 
 class Sc203Handler(Sc202Handler):
     """
-    Sc203: Sc202 + bid-ask 스프레드
+    Sc203: Sc202 + bid-ask 스프레드(최우선 매도호가와 최우선 매수호가의 차이)
+    컬럼 순서: [bid_1, bid_2, ..., bid_n, ask_1, ask_2, ..., ask_n]
     """
-    def get_additional_features(self, step: int, position: int, pnl: float = 0.0, spread: float = 0.0) -> list:
+    def calculate_spread(self, step: int) -> float:
+        """
+        주어진 step에서 최우선 매도호가 - 최우선 매수호가를 계산하여 반환.
+        예: lob_levels=3 이면
+            best_bid = row.iloc[0]    # bid_1
+            best_ask = row.iloc[3]    # ask_1
+        """
+        bid = self.df.loc[step, 'bid_px_00']
+        ask = self.df.loc[step, 'ask_px_00']
+        spread = ask - bid
+        return spread
+    
+    def get_additional_features(self, step: int, position: int, pnl: float = 0.0, **kwargs) -> list:
+        # Sc202까지의 features (lob, snapshots, position, pnl)
         base = super().get_additional_features(step, position, pnl)
+        # spread를 직접 계산
+        spread = self.calculate_spread(step)
         return base + [spread]
 
 def create_data_handler(
