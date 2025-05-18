@@ -165,3 +165,8 @@ class TickStockTradingEnv(gym.Env):
         pos = self.inventory.get_position(self.ticker)
         cash = self.inventory.get_cash()
         print(f"Step:{self.current_step} | Bid:{bid:.2f} | Ask:{ask:.2f} | Pos:{pos} | Cash:{cash:.2f}")
+
+    def seed(self, seed=None):
+        """Set the random seed for the environment."""
+        np.random.seed(seed)
+        return [seed]
