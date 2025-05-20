@@ -15,8 +15,11 @@ import pandas as pd
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.infrastructure.pytorch_util import init_gpu
-from src.env.tick_stock_trading_env import TickStockTradingEnv
+from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
 from src.data_handler.data_handler import Sc203Handler
+from src.env.observation import Observation, InputType
+from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
+
 # from eval_environment import eval_agent
 
 def main(args):
@@ -33,24 +36,29 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() and not args.no_gpu else "cpu")
 
     save_directory = str(time.time()) + (args.tag if args.tag is not None else '')
-    data_path = args.data_path
-    df = pd.read_csv(data_path)
+    
+    df_all = merge_lob_and_ohlcv(args.lob_csv_path, args.ohlcv_csv_path)
+    splitter = DataSplitter(train_ratio=0.7, val_ratio=0.2, test_ratio=0.1)
+    df_train, df_val, df_test = splitter.split(df_all)
     
     # 틱 단위 거래 환경 생성
-    env = TickStockTradingEnv(
-        df=df,
+    env = MinutelyOrderbookOHLCVEnv(
+        df=df_train,
         handler_cls=Sc203Handler,
         initial_cash=args.initial_cash, # Starting cash
         lob_levels=args.lob_levels,                     # Max shares to trade
         lookback=args.lookback,
-        ticker=args.ticker,
-        transaction_fee=args.transaction_fee
+        window_size=args.window_size,
+        input_type=InputType.MLP,
+        transaction_fee=args.transaction_fee,
+        h_max=args.h_max,
+        hold_threshold=args.hold_threshold
     )
 
-    train_agent(env, save_directory, device)
+    train_agent(env, save_directory, device, args)
 
 
-def train_agent(env, save_directory, device):
+def train_agent(env, save_directory, device, args):
     os.makedirs('runs/' + save_directory, exist_ok=True)
 
     with open(os.path.join('runs/' + save_directory, 'parameters.yaml'), 'w') as file:
@@ -86,16 +94,22 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
     # Data and Environment arguments
-    parser.add_argument("--data_path", type=str, default='./src/db/AAPL_minute_orderbook_2019_01-07_combined.csv',
-                        required=False, help='Path to the training data') # 삼성전자 2014~2017년 데이터(업로드 된 것 사용)
+    parser.add_argument("--lob_csv_path", type=str, default="src/db/AAPL_minute_orderbook_2019_01-07_combined.csv",
+                        required=False, help='LOB CSV path')
+    parser.add_argument("--ohlcv_csv_path", type=str, default="src/db/AAPL_minute_ohlcv_2019_01-07_combined.csv",
+                        required=False, help='OHLCV CSV path')
     parser.add_argument("--initial_cash", type=float, default=100000.0,
                         required=False, help='Starting cash')
     parser.add_argument("--lob_levels", type=int, default=10,
                         required=False, help='Max shares to trade')
     parser.add_argument("--lookback", type=int, default=9,
                         required=False, help='Lookback')
-    parser.add_argument("--ticker", type=str, default="TICKER",
-                        required=False, help='Ticker')
+    parser.add_argument("--h_max", type=int, default=1,
+                        required=False, help='Max action')
+    parser.add_argument("--hold_threshold", type=float, default=0.2,
+                        required=False, help='Hold threshold')
+    parser.add_argument("--window_size", type=int, default=9,
+                        required=False, help='Window size')
     parser.add_argument("--transaction_fee", type=float, default=0.0023,
                         required=False, help='Transaction fee')
 
