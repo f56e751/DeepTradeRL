@@ -17,6 +17,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from src.infrastructure.pytorch_util import init_gpu
 from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
 from src.data_handler.data_handler import Sc203Handler
+from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler
 from src.env.observation import Observation, InputType
 from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
 
@@ -44,7 +45,7 @@ def main(args):
     # 틱 단위 거래 환경 생성
     env = MinutelyOrderbookOHLCVEnv(
         df=df_train,
-        handler_cls=Sc203Handler,
+        handler_cls=Sc203OHLCVHandler,
         initial_cash=args.initial_cash, # Starting cash
         lob_levels=args.lob_levels,                     # Max shares to trade
         lookback=args.lookback,
