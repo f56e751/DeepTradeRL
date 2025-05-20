@@ -179,3 +179,8 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
     def get_obs_dim(self):
         """관측(observation) 벡터의 차원(shape)을 반환합니다."""
         return self.observation_space.shape
+
+    def seed(self, seed=None):
+        """Set the random seed for reproducibility"""
+        np.random.seed(seed)
+        return [seed]

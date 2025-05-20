@@ -3,14 +3,18 @@ import time
 import os
 import random
 import numpy as np
-
+import psutil
 import torch
 import yaml
 from stable_baselines3 import PPO
 from stable_baselines3.common.logger import configure
+from stable_baselines3.common.callbacks import BaseCallback
 import sys
 import os
 import pandas as pd
+from tqdm import tqdm
+import GPUtil
+
 # Add the src directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -22,6 +26,56 @@ from src.env.observation import Observation, InputType
 from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
 
 # from eval_environment import eval_agent
+
+class TrainingStatusCallback(BaseCallback):
+    def __init__(self, verbose=0):
+        super().__init__(verbose)
+        self.start_time = time.time()
+        self.last_time = self.start_time
+        self.last_episode_rewards = []
+        self.episode_rewards = []
+        self.episode_lengths = []
+        self.episode_times = []
+        self.training_start = time.time()
+        
+    def _on_step(self):
+        # Get current episode info
+        if len(self.model.ep_info_buffer) > 0:
+            episode_info = self.model.ep_info_buffer[-1]
+            if episode_info is not None:
+                self.episode_rewards.append(episode_info['r'])
+                self.episode_lengths.append(episode_info['l'])
+                self.episode_times.append(time.time() - self.last_time)
+                self.last_time = time.time()
+                
+                # Calculate statistics
+                mean_reward = np.mean(self.episode_rewards[-100:])
+                mean_length = np.mean(self.episode_lengths[-100:])
+                mean_time = np.mean(self.episode_times[-100:])
+                
+                # Get system stats
+                memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+                if torch.cuda.is_available():
+                    gpu = GPUtil.getGPUs()[0]
+                    gpu_load = gpu.load * 100
+                    gpu_memory = gpu.memoryUsed
+                else:
+                    gpu_load = 0
+                    gpu_memory = 0
+                
+                # Calculate progress
+                progress = (self.num_timesteps / self.locals['total_timesteps']) * 100
+                
+                # Print status
+                print(f"\rProgress: {progress:.1f}% | "
+                      f"Mean Reward: {mean_reward:.2f} | "
+                      f"Mean Length: {mean_length:.1f} | "
+                      f"Time/Episode: {mean_time:.2f}s | "
+                      f"Memory: {memory:.0f}MB | "
+                      f"GPU Load: {gpu_load:.0f}% | "
+                      f"GPU Memory: {gpu_memory}MB", end="")
+                
+        return True
 
 def main(args):
     if args.seed is None:
@@ -65,28 +119,32 @@ def train_agent(env, save_directory, device, args):
     with open(os.path.join('runs/' + save_directory, 'parameters.yaml'), 'w') as file:
         yaml.dump(args._get_kwargs(), file)
 
-    # Define policy network architecture with proper initialization
-    """
-    policy_kwargs = dict(
-        net_arch=dict(
-            pi=args.net_arch,  # Policy network
-            vf=args.net_arch   # Value network
-        ),
-        activation_fn=torch.nn.ReLU,
-        normalize_images=True
-    )
-    """
-
-    model = PPO('MlpPolicy', verbose=1, env=env,
+    # Initialize model with custom logger
+    model = PPO('MlpPolicy', verbose=0, env=env,
                 gamma=args.gamma, ent_coef=args.ent_coef, max_grad_norm=args.grad_clip,
-                learning_rate=args.lr, # policy_kwargs=policy_kwargs,
+                learning_rate=args.lr,
                 device=device, batch_size=128, seed=args.seed,
                 tensorboard_log=os.path.join('runs/' + save_directory, 'tensorboard'))
 
+    # Set up logging
     logger = configure(os.path.join('runs/' + save_directory, '0'), ["csv", "tensorboard"])
     model.set_logger(logger)
-    model.learn(args.iters, reset_num_timesteps=True)
-
+    
+    # Add training status callback
+    status_callback = TrainingStatusCallback()
+    
+    print("\nStarting training...")
+    print(f"Total timesteps: {args.iters}")
+    print(f"Device: {device}")
+    print(f"Model saved to: runs/{save_directory}")
+    print("\nTraining Status:")
+    
+    # Train with progress tracking
+    model.learn(args.iters, reset_num_timesteps=True, callback=status_callback)
+    
+    print("\n\nTraining completed!")
+    print(f"Total training time: {(time.time() - status_callback.training_start)/60:.1f} minutes")
+    
     env.close()
     model.save(os.path.join(os.path.join('runs/' + save_directory), 'agent'))
 

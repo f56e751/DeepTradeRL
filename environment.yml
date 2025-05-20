@@ -16,4 +16,7 @@ dependencies:
   - pip
   - pip:
     - wandb
-    - tensorboard 
+    - tensorboard
+    - psutil
+    - gputil
+    - tqdm 
