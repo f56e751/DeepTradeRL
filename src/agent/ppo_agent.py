@@ -27,7 +27,7 @@ from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
 # from eval_environment import eval_agent
 
 class TrainingStatusCallback(BaseCallback):
-    def __init__(self, verbose=0):
+    def __init__(self, agent, verbose=0):
         super().__init__(verbose)
         self.start_time = time.time()
         self.last_time = self.start_time
@@ -36,10 +36,11 @@ class TrainingStatusCallback(BaseCallback):
         self.episode_times = []
         self.training_start = time.time()
         self.total_episodes = 0
+        self.agent = agent
         
     def _on_step(self):
         # Get episode info from logger
-        if self.logger is not None:
+        if self.agent.logger is not None:
             # Get the latest logged values
             logged_values = self.logger.name_to_value
             if 'train/ep_rew_mean' in logged_values:
@@ -124,7 +125,7 @@ def train_agent(env, save_directory, device, args):
     model.set_logger(logger)
     
     # Add training status callback
-    status_callback = TrainingStatusCallback()
+    status_callback = TrainingStatusCallback(model)
     
     print("\nStarting training...")
     print(f"Total timesteps: {args.iters}")
