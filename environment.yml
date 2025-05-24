@@ -1,0 +1,19 @@
+name: rl-hft
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pytorch
+  - torchvision
+  - torchaudio
+  - numpy
+  - pandas
+  - stable-baselines3
+  - psutil
+  - pyyaml
+  - tqdm
+  - pip
+  - pip:
+    - tensorboard 
