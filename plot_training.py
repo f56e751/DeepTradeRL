@@ -19,8 +19,17 @@ def plot_training_metrics(log_dir):
     
     df = pd.read_csv(csv_file)
     
-    # Print available columns for debugging
-    print("Available columns:", df.columns.tolist())
+    # Display DataFrame information
+    print("\nDataFrame Info:")
+    print("=" * 50)
+    print("\nColumns (keys):")
+    print(df.columns.tolist())
+    print("\nFirst few rows:")
+    print(df.head())
+    print("\nDataFrame shape:", df.shape)
+    print("\nDataFrame description:")
+    print(df.describe())
+    print("=" * 50)
     
     # Set style
     plt.style.use('seaborn')
@@ -76,7 +85,7 @@ def plot_training_metrics(log_dir):
     plt.tight_layout()
     save_path = os.path.join(os.path.dirname(log_dir), 'training_plots.png')
     plt.savefig(save_path)
-    print(f"Plots saved to {save_path}")
+    print(f"\nPlots saved to {save_path}")
     plt.close()
 
 def main():
