@@ -1,21 +1,55 @@
-# Python
+# Python cache files
 __pycache__/
 *.py[cod]
 *$py.class
+<<<<<<< HEAD
+=======
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+>>>>>>> origin/main
 **/__pycache__/
 **/*.pyc
 
-# macOS
-.DS_Store
-
-# Training runs
-runs/
-
-# IDE
-.vscode/
-.idea/
-
-# Environment
-.env
+# Virtual environment
 venv/
 env/
+ENV/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Project specific
+runs/ 
