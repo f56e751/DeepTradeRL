@@ -19,6 +19,9 @@ def plot_training_metrics(log_dir):
     
     df = pd.read_csv(csv_file)
     
+    # Print available columns for debugging
+    print("Available columns:", df.columns.tolist())
+    
     # Set style
     plt.style.use('seaborn')
     sns.set_palette("husl")
@@ -29,18 +32,22 @@ def plot_training_metrics(log_dir):
     
     # Plot rewards
     ax = axes[0, 0]
-    ax.plot(df['time/total_timesteps'], df['train/ep_rew_mean'], label='Mean Reward')
-    ax.plot(df['time/total_timesteps'], df['train/reward'], label='Current Reward', alpha=0.5)
-    ax.set_title('Rewards')
+    if 'train/reward' in df.columns:
+        ax.plot(df['time/total_timesteps'], df['train/reward'], label='Reward')
+    if 'train/realized_pnl' in df.columns:
+        ax.plot(df['time/total_timesteps'], df['train/realized_pnl'], label='Realized PnL')
+    ax.set_title('Rewards and PnL')
     ax.set_xlabel('Timesteps')
-    ax.set_ylabel('Reward')
+    ax.set_ylabel('Value')
     ax.legend()
     ax.grid(True)
     
     # Plot PnL
     ax = axes[0, 1]
-    ax.plot(df['time/total_timesteps'], df['train/realized_pnl'], label='Realized PnL')
-    ax.plot(df['time/total_timesteps'], df['train/unrealized_pnl'], label='Unrealized PnL')
+    if 'train/unrealized_pnl' in df.columns:
+        ax.plot(df['time/total_timesteps'], df['train/unrealized_pnl'], label='Unrealized PnL')
+    if 'train/realized_pnl' in df.columns:
+        ax.plot(df['time/total_timesteps'], df['train/realized_pnl'], label='Realized PnL')
     ax.set_title('Profit and Loss')
     ax.set_xlabel('Timesteps')
     ax.set_ylabel('PnL')
@@ -49,19 +56,21 @@ def plot_training_metrics(log_dir):
     
     # Plot episode length
     ax = axes[1, 0]
-    ax.plot(df['time/total_timesteps'], df['train/ep_len_mean'])
-    ax.set_title('Episode Length')
-    ax.set_xlabel('Timesteps')
-    ax.set_ylabel('Length')
-    ax.grid(True)
+    if 'train/ep_len_mean' in df.columns:
+        ax.plot(df['time/total_timesteps'], df['train/ep_len_mean'])
+        ax.set_title('Episode Length')
+        ax.set_xlabel('Timesteps')
+        ax.set_ylabel('Length')
+        ax.grid(True)
     
     # Plot explained variance
     ax = axes[1, 1]
-    ax.plot(df['time/total_timesteps'], df['train/explained_variance'])
-    ax.set_title('Explained Variance')
-    ax.set_xlabel('Timesteps')
-    ax.set_ylabel('Variance')
-    ax.grid(True)
+    if 'train/explained_variance' in df.columns:
+        ax.plot(df['time/total_timesteps'], df['train/explained_variance'])
+        ax.set_title('Explained Variance')
+        ax.set_xlabel('Timesteps')
+        ax.set_ylabel('Variance')
+        ax.grid(True)
     
     # Adjust layout and save
     plt.tight_layout()
