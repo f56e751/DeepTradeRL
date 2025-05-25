@@ -3,7 +3,6 @@ import time
 import os
 import random
 import numpy as np
-import psutil
 import torch
 import yaml
 from stable_baselines3 import PPO
@@ -13,6 +12,7 @@ import sys
 import os
 import pandas as pd
 from tqdm import tqdm
+
 
 # Add the src directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -24,10 +24,10 @@ from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, 
 from src.env.observation import Observation, InputType
 from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
 
-# from eval_environment import eval_agent
+
 
 class TrainingStatusCallback(BaseCallback):
-    def __init__(self, agent, verbose=0):
+    def __init__(self, save_path=None, save_freq=10000, verbose=0):
         super().__init__(verbose)
         self.start_time = time.time()
         self.last_time = self.start_time
@@ -36,16 +36,41 @@ class TrainingStatusCallback(BaseCallback):
         self.episode_times = []
         self.training_start = time.time()
         self.total_episodes = 0
-        self.agent = agent
+        self.save_path = save_path
+        self.save_freq = save_freq
+        
+        # Initialize metrics tracking
+        self.metrics_to_track = [
+            'train/ep_rew_mean',
+            'train/ep_len_mean',
+            'train/explained_variance',
+            'train/learning_rate',
+            'train/reward',
+            'train/realized_pnl',
+            'train/unrealized_pnl'
+        ]
+        self.metrics_history = {metric: [] for metric in self.metrics_to_track}
         
     def _on_step(self):
         # Get episode info from logger
-        if self.agent.logger is not None:
+        if self.logger is not None:
             # Get the latest logged values
             logged_values = self.logger.name_to_value
+            
+            # Track metrics
+            for metric in self.metrics_to_track:
+                if metric in logged_values:
+                    self.metrics_history[metric].append(logged_values[metric])
+            
+            # Track episode rewards and lengths
             if 'train/ep_rew_mean' in logged_values:
                 mean_reward = logged_values['train/ep_rew_mean']
                 mean_length = logged_values['train/ep_len_mean']
+                explained_var = logged_values.get('train/explained_variance', 0)
+                lr = logged_values.get('train/learning_rate', 0)
+                reward = logged_values.get('train/reward', 0)
+                realized_pnl = logged_values.get('train/realized_pnl', 0)
+                unrealized_pnl = logged_values.get('train/unrealized_pnl', 0)
                 
                 self.total_episodes += 1
                 self.episode_rewards.append(mean_reward)
@@ -53,21 +78,63 @@ class TrainingStatusCallback(BaseCallback):
                 self.episode_times.append(time.time() - self.last_time)
                 self.last_time = time.time()
                 
-                # Get system stats
-                memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
-                
                 # Calculate progress
                 progress = (self.num_timesteps / self.locals['total_timesteps']) * 100
                 
-                # Print status
+                # Print status with more metrics
                 print(f"\rProgress: {progress:.1f}% | "
                       f"Episodes: {self.total_episodes} | "
                       f"Mean Reward: {mean_reward:.2f} | "
+                      f"Reward: {reward:.2f} | "
+                      f"Realized PnL: {realized_pnl:.2f} | "
+                      f"Unrealized PnL: {unrealized_pnl:.2f} | "
                       f"Mean Length: {mean_length:.1f} | "
-                      f"Time/Episode: {(time.time() - self.last_time):.2f}s | "
-                      f"Memory: {memory:.0f}MB", end="")
-            
+                      f"Explained Var: {explained_var:.2f} | "
+                      f"LR: {lr:.2e} | ")
+        
+        # Save model checkpoint if save_path is provided
+        if self.save_path and self.num_timesteps % self.save_freq == 0:
+            checkpoint_path = os.path.join(self.save_path, f"model_{self.num_timesteps}")
+            self.model.save(checkpoint_path)
+            if self.verbose > 0:
+                print(f"\nSaved model checkpoint to {checkpoint_path}")
+        
         return True
+    
+    def on_training_end(self):
+        """Called when training ends."""
+        training_time = time.time() - self.training_start
+        
+        # Save training summary if save_path is provided
+        if self.save_path:
+            # Get the final metrics
+            final_reward = self.episode_rewards[-1] if self.episode_rewards else 0.0
+            final_length = self.episode_lengths[-1] if self.episode_lengths else 0.0
+            final_explained_var = self.metrics_history['train/explained_variance'][-1] if self.metrics_history['train/explained_variance'] else 0.0
+            final_lr = self.metrics_history['train/learning_rate'][-1] if self.metrics_history['train/learning_rate'] else 0.0
+            
+            summary = {
+                'total_timesteps': self.num_timesteps,
+                'total_episodes': self.total_episodes,
+                'training_time': training_time,
+                'final_reward': final_reward,
+                'final_length': final_length,
+                'final_explained_variance': final_explained_var,
+                'final_learning_rate': final_lr
+            }
+            
+            # Save summary to file
+            with open(os.path.join(self.save_path, 'training_summary.txt'), 'w') as f:
+                for key, value in summary.items():
+                    f.write(f"{key}: {value}\n")
+        
+        if self.verbose > 0:
+            if self.episode_rewards:
+                print(f"Final mean reward: {self.episode_rewards[-1]:.2f}")
+            if self.episode_lengths:
+                print(f"Final mean episode length: {self.episode_lengths[-1]:.1f}")
+            if self.metrics_history['train/explained_variance']:
+                print(f"Final explained variance: {self.metrics_history['train/explained_variance'][-1]:.2f}")
 
 def main(args):
     if args.seed is None:
@@ -118,14 +185,21 @@ def train_agent(env, save_directory, device, args):
                 gamma=args.gamma, ent_coef=args.ent_coef, max_grad_norm=args.grad_clip,
                 learning_rate=args.lr,
                 device=device, batch_size=128, seed=args.seed,
+                policy_kwargs=dict(net_arch=dict(pi=[64, 64], vf=[64, 64])),
                 tensorboard_log=os.path.join('runs/' + save_directory, 'tensorboard'))
 
-    # Set up logging
-    logger = configure(os.path.join('runs/' + save_directory, '0'), ["csv", "tensorboard"])
+    # Set up logging with more detailed configuration
+    log_path = os.path.join('runs/' + save_directory, '0')
+    os.makedirs(log_path, exist_ok=True)
+    logger = configure(log_path, ["csv", "tensorboard", "stdout"])
     model.set_logger(logger)
     
-    # Add training status callback
-    status_callback = TrainingStatusCallback(model)
+    # Add training status callback with save path
+    status_callback = TrainingStatusCallback(
+        save_path=os.path.join('runs', save_directory),
+        save_freq=10000,  # Save model every 10000 timesteps
+        verbose=1
+    )
     
     print("\nStarting training...")
     print(f"Total timesteps: {args.iters}")
@@ -176,7 +250,6 @@ if __name__ == '__main__':
     parser.add_argument("--grad_clip", type=float, default=.5)
     parser.add_argument("--gamma", type=float, default=.99)
     parser.add_argument("--ent_coef", type=float, default=.0089)
-    parser.add_argument("--net_arch", type=int, default=[64, 64])
 
     # Misc arguments
     parser.add_argument("--seed", type=int, default=42)
