@@ -4,6 +4,7 @@ import yaml
 from stable_baselines3.common.callbacks import BaseCallback
 import pandas as pd
 from tqdm import tqdm
+import time
 
 
 
@@ -12,6 +13,7 @@ class TrainingStatusCallback(BaseCallback):
         super().__init__(verbose)
         self.episode_rewards = []  # Raw rewards from each episode
         self.episode_lengths = []
+        self.training_start = time.time()  # Initialize training start time
         self.metrics_to_track = [
             'train/reward',  # This will be the mean reward
             'train/raw_reward',  # This will be the raw reward
