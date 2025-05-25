@@ -1,6 +1,7 @@
 from collections import deque
 from enum import Enum, auto
 import numpy as np
+from typing import Tuple
 
 class InputType(Enum):
     MLP = auto()
@@ -141,28 +142,46 @@ class Observation:
             parts.append(h['ohlcv'])
         return np.concatenate(parts, axis=0)
 
-    def get_lstm_input(self) -> np.ndarray:
-        """
-        히스토리에 저장된 전체 시퀀스를 위한 LSTM 입력(shape=(T, dim_total))을 반환합니다.
-        T = 현재 히스토리 길이 (<= window_size)
-        """
+    # def get_lstm_input(self) -> np.ndarray:
+    #     """
+    #     히스토리에 저장된 전체 시퀀스를 위한 LSTM 입력(shape=(T, dim_total))을 반환합니다.
+    #     T = 현재 히스토리 길이 (<= window_size)
+    #     """
+    #     if not self.history:
+    #         raise ValueError("히스토리가 비어 있습니다. append()로 먼저 관측을 추가하세요.")
+    #     seq = []
+    #     for h in self.history:
+    #         parts = [
+    #             h['snapshots'],
+    #             h['current'],
+    #             np.array([h['position']], dtype=float)
+    #         ]
+    #         if self.include_pnl:
+    #             parts.append(np.array([h['pnl']], dtype=float))
+    #         if self.include_spread:
+    #             parts.append(np.array([h['spread']], dtype=float))
+    #         if self.include_ohlcv:
+    #             parts.append(h['ohlcv'])
+    #         seq.append(np.concatenate(parts, axis=0))
+    #     return np.vstack(seq)
+
+    def get_lstm_input(self) -> dict:
         if not self.history:
             raise ValueError("히스토리가 비어 있습니다. append()로 먼저 관측을 추가하세요.")
-        seq = []
+        snaps_list, others_list = [], []
         for h in self.history:
-            parts = [
-                h['snapshots'],
-                h['current'],
-                np.array([h['position']], dtype=float)
-            ]
-            if self.include_pnl:
-                parts.append(np.array([h['pnl']], dtype=float))
-            if self.include_spread:
-                parts.append(np.array([h['spread']], dtype=float))
-            if self.include_ohlcv:
-                parts.append(h['ohlcv'])
-            seq.append(np.concatenate(parts, axis=0))
-        return np.vstack(seq)
+            part1 = np.concatenate([h['snapshots'], h['current']], axis=0)
+            rest = [np.array([h['position']], dtype=float)]
+            if self.include_pnl:    rest.append(np.array([h['pnl']], dtype=float))
+            if self.include_spread: rest.append(np.array([h['spread']], dtype=float))
+            if self.include_ohlcv:  rest.append(h['ohlcv'])
+            part2 = np.concatenate(rest, axis=0)
+            snaps_list.append(part1)
+            others_list.append(part2)
+        return {
+            'snapshots': np.vstack(snaps_list),
+            'others':    np.vstack(others_list)
+        }
 
     def get_dimension(self, input_type: InputType):
         """
