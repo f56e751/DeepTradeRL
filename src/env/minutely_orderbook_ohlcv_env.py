@@ -74,7 +74,33 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
         # Spaces
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
         sample = self._init_observation()
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=sample.shape, dtype=np.float32)
+
+
+        
+        # --- observation_space 설정: Dict 또는 Box ---
+        # self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=sample.shape, dtype=np.float32)
+        if self.input_type == InputType.LSTM:
+            snaps_dim = self.observation.dim_snapshots + self.observation.dim_current
+            rest_dim = self.observation.dim_total - snaps_dim
+            self.observation_space = spaces.Dict({
+                'snapshots': spaces.Box(
+                    low=-np.inf, high=np.inf,
+                    shape=(self.observation.window_size, snaps_dim),
+                    dtype=np.float32
+                ),
+                'others': spaces.Box(
+                    low=-np.inf, high=np.inf,
+                    shape=(self.observation.window_size, rest_dim),
+                    dtype=np.float32
+                )
+            })
+        else:
+            # MLP 입력은 기존 단일 벡터
+            self.observation_space = spaces.Box(
+                low=-np.inf, high=np.inf,
+                shape=(self.observation.dim_total,),
+                dtype=np.float32
+            )
 
     def _init_observation(self):
         self.observation.reset()
@@ -121,6 +147,7 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
         self.observation.append(feats)
         if self.input_type == InputType.MLP:
             return self.observation.get_mlp_input()
+        # LSTM인 경우 dict 형태로 반환
         return self.observation.get_lstm_input()
 
     def step(self, action):
