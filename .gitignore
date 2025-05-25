@@ -1,1 +1,19 @@
-new_venv/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# macOS
+.DS_Store
+
+# Training runs
+runs/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+venv/
+env/
