@@ -27,114 +27,73 @@ from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
 
 
 class TrainingStatusCallback(BaseCallback):
-    def __init__(self, save_path=None, save_freq=10000, verbose=0):
+    def __init__(self, verbose=0):
         super().__init__(verbose)
-        self.start_time = time.time()
-        self.last_time = self.start_time
         self.episode_rewards = []
         self.episode_lengths = []
-        self.episode_times = []
-        self.training_start = time.time()
-        self.total_episodes = 0
-        self.save_path = save_path
-        self.save_freq = save_freq
-        
-        # Initialize metrics tracking
+        self.raw_rewards = []  # Track raw rewards
         self.metrics_to_track = [
-            'train/ep_rew_mean',
+            'train/reward',
+            'train/raw_reward',  # Add raw reward metric
             'train/ep_len_mean',
             'train/explained_variance',
-            'train/learning_rate',
-            'train/reward',
-            'train/realized_pnl',
-            'train/unrealized_pnl'
+            'train/learning_rate'
         ]
-        self.metrics_history = {metric: [] for metric in self.metrics_to_track}
-        
+
     def _on_step(self):
-        # Get episode info from logger
-        if self.logger is not None:
-            # Get the latest logged values
-            logged_values = self.logger.name_to_value
-            
-            # Track metrics
-            for metric in self.metrics_to_track:
-                if metric in logged_values:
-                    self.metrics_history[metric].append(logged_values[metric])
-            
-            # Track episode rewards and lengths
-            if 'train/ep_rew_mean' in logged_values:
-                mean_reward = logged_values['train/ep_rew_mean']
-                mean_length = logged_values['train/ep_len_mean']
-                explained_var = logged_values.get('train/explained_variance', 0)
-                lr = logged_values.get('train/learning_rate', 0)
-                reward = logged_values.get('train/reward', 0)
-                realized_pnl = logged_values.get('train/realized_pnl', 0)
-                unrealized_pnl = logged_values.get('train/unrealized_pnl', 0)
-                
-                self.total_episodes += 1
-                self.episode_rewards.append(mean_reward)
-                self.episode_lengths.append(mean_length)
-                self.episode_times.append(time.time() - self.last_time)
-                self.last_time = time.time()
-                
-                # Calculate progress
-                progress = (self.num_timesteps / self.locals['total_timesteps']) * 100
-                
-                # Print status with more metrics
-                print(f"\rProgress: {progress:.1f}% | "
-                      f"Episodes: {self.total_episodes} | "
-                      f"Mean Reward: {mean_reward:.2f} | "
-                      f"Reward: {reward:.2f} | "
-                      f"Realized PnL: {realized_pnl:.2f} | "
-                      f"Unrealized PnL: {unrealized_pnl:.2f} | "
-                      f"Mean Length: {mean_length:.1f} | "
-                      f"Explained Var: {explained_var:.2f} | "
-                      f"LR: {lr:.2e} | ")
+        # Track episode rewards and lengths
+        if len(self.model.ep_info_buffer) > 0:
+            self.episode_rewards.extend([ep_info["r"] for ep_info in self.model.ep_info_buffer])
+            self.episode_lengths.extend([ep_info["l"] for ep_info in self.model.ep_info_buffer])
+            self.model.ep_info_buffer.clear()
+
+        # Track raw reward from the last step
+        if len(self.locals['rewards']) > 0:
+            self.raw_rewards.append(self.locals['rewards'][-1])
+
+        # Log metrics
+        self.logger.record("train/reward", np.mean(self.episode_rewards) if self.episode_rewards else 0.0)
+        self.logger.record("train/raw_reward", self.raw_rewards[-1] if self.raw_rewards else 0.0)
+        self.logger.record("train/ep_len_mean", np.mean(self.episode_lengths) if self.episode_lengths else 0.0)
         
-        # Save model checkpoint if save_path is provided
-        if self.save_path and self.num_timesteps % self.save_freq == 0:
-            checkpoint_path = os.path.join(self.save_path, f"model_{self.num_timesteps}")
-            self.model.save(checkpoint_path)
-            if self.verbose > 0:
-                print(f"\nSaved model checkpoint to {checkpoint_path}")
-        
+        # Log progress
+        if self.num_timesteps % 1000 == 0:
+            mean_reward = np.mean(self.episode_rewards) if self.episode_rewards else 0.0
+            mean_length = np.mean(self.episode_lengths) if self.episode_lengths else 0.0
+            progress = (self.num_timesteps / self.locals['total_timesteps']) * 100
+            
+            print(f"\nStep {self.num_timesteps}")
+            print(f"Mean Reward: {mean_reward:.2f}")
+            print(f"Raw Reward: {self.raw_rewards[-1] if self.raw_rewards else 0.0:.2f}")
+            print(f"Mean Episode Length: {mean_length:.2f}")
+            print(f"Progress: {progress:.1f}%")
+            print(f"Learning Rate: {self.locals['self'].learning_rate:.6f}")
+
         return True
-    
-    def on_training_end(self):
-        """Called when training ends."""
-        training_time = time.time() - self.training_start
+
+    def _on_training_end(self):
+        # Create final summary
+        mean_reward = np.mean(self.episode_rewards) if self.episode_rewards else 0.0
+        mean_length = np.mean(self.episode_lengths) if self.episode_lengths else 0.0
         
-        # Save training summary if save_path is provided
-        if self.save_path:
-            # Get the final metrics
-            final_reward = self.episode_rewards[-1] if self.episode_rewards else 0.0
-            final_length = self.episode_lengths[-1] if self.episode_lengths else 0.0
-            final_explained_var = self.metrics_history['train/explained_variance'][-1] if self.metrics_history['train/explained_variance'] else 0.0
-            final_lr = self.metrics_history['train/learning_rate'][-1] if self.metrics_history['train/learning_rate'] else 0.0
-            
-            summary = {
-                'total_timesteps': self.num_timesteps,
-                'total_episodes': self.total_episodes,
-                'training_time': training_time,
-                'final_reward': final_reward,
-                'final_length': final_length,
-                'final_explained_variance': final_explained_var,
-                'final_learning_rate': final_lr
-            }
-            
-            # Save summary to file
-            with open(os.path.join(self.save_path, 'training_summary.txt'), 'w') as f:
-                for key, value in summary.items():
-                    f.write(f"{key}: {value}\n")
+        summary = {
+            'mean_reward': mean_reward,
+            'mean_episode_length': mean_length,
+            'total_episodes': len(self.episode_rewards),
+            'total_timesteps': self.num_timesteps
+        }
         
-        if self.verbose > 0:
-            if self.episode_rewards:
-                print(f"Final mean reward: {self.episode_rewards[-1]:.2f}")
-            if self.episode_lengths:
-                print(f"Final mean episode length: {self.episode_lengths[-1]:.1f}")
-            if self.metrics_history['train/explained_variance']:
-                print(f"Final explained variance: {self.metrics_history['train/explained_variance'][-1]:.2f}")
+        # Save summary to file
+        summary_path = os.path.join(self.locals['self'].log_dir, 'training_summary.yaml')
+        with open(summary_path, 'w') as f:
+            yaml.dump(summary, f)
+        
+        print("\nTraining Summary:")
+        print(f"Mean Reward: {mean_reward:.2f}")
+        print(f"Mean Episode Length: {mean_length:.2f}")
+        print(f"Total Episodes: {len(self.episode_rewards)}")
+        print(f"Total Timesteps: {self.num_timesteps}")
+        print(f"\nSummary saved to: {summary_path}")
 
 def main(args):
     if args.seed is None:
@@ -196,8 +155,6 @@ def train_agent(env, save_directory, device, args):
     
     # Add training status callback with save path
     status_callback = TrainingStatusCallback(
-        save_path=os.path.join('runs', save_directory),
-        save_freq=10000,  # Save model every 10000 timesteps
         verbose=1
     )
     

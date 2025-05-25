@@ -34,10 +34,12 @@ def plot_training_metrics(log_dir):
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     fig.suptitle('Training Metrics', fontsize=16)
     
-    # Plot rewards
+    # Plot rewards (both raw and mean)
     ax = axes[0, 0]
-    if 'rollout/ep_rew_mean' in df.columns:
-        ax.plot(df['time/total_timesteps'], df['rollout/ep_rew_mean'], label='Mean Reward')
+    if 'train/reward' in df.columns:
+        ax.plot(df['time/total_timesteps'], df['train/reward'], label='Mean Reward', alpha=0.7)
+    if 'train/raw_reward' in df.columns:
+        ax.plot(df['time/total_timesteps'], df['train/raw_reward'], label='Raw Reward', alpha=0.3, color='red')
     ax.set_title('Rewards')
     ax.set_xlabel('Timesteps')
     ax.set_ylabel('Reward')
@@ -46,8 +48,8 @@ def plot_training_metrics(log_dir):
     
     # Plot episode length
     ax = axes[0, 1]
-    if 'rollout/ep_len_mean' in df.columns:
-        ax.plot(df['time/total_timesteps'], df['rollout/ep_len_mean'])
+    if 'train/ep_len_mean' in df.columns:
+        ax.plot(df['time/total_timesteps'], df['train/ep_len_mean'])
         ax.set_title('Episode Length')
         ax.set_xlabel('Timesteps')
         ax.set_ylabel('Length')
@@ -68,7 +70,7 @@ def plot_training_metrics(log_dir):
         ax.plot(df['time/total_timesteps'], df['train/learning_rate'])
         ax.set_title('Learning Rate')
         ax.set_xlabel('Timesteps')
-        ax.set_ylabel('Learning Rate')
+        ax.set_ylabel('Rate')
         ax.grid(True)
     
     # Adjust layout and save
