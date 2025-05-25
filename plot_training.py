@@ -30,48 +30,25 @@ def plot_training_metrics(log_dir):
     plt.style.use('seaborn')
     sns.set_palette("husl")
     
-    # Create figure with subplots
-    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-    fig.suptitle('Training Metrics', fontsize=16)
+    # Create figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10))
+    fig.suptitle('Training Rewards', fontsize=16)
     
-    # Plot rewards (both raw and mean)
-    ax = axes[0, 0]
+    # Plot mean reward
     if 'train/reward' in df.columns:
-        ax.plot(df['time/total_timesteps'], df['train/reward'], label='Mean Reward', alpha=0.7)
+        ax1.plot(df['time/total_timesteps'], df['train/reward'], label='Mean Reward', color='blue')
+        ax1.set_title('Mean Reward Over Time')
+        ax1.set_xlabel('Timesteps')
+        ax1.set_ylabel('Mean Reward')
+        ax1.grid(True)
+    
+    # Plot raw reward
     if 'train/raw_reward' in df.columns:
-        ax.plot(df['time/total_timesteps'], df['train/raw_reward'], label='Raw Reward', alpha=0.3, color='red')
-    ax.set_title('Rewards')
-    ax.set_xlabel('Timesteps')
-    ax.set_ylabel('Reward')
-    ax.legend()
-    ax.grid(True)
-    
-    # Plot episode length
-    ax = axes[0, 1]
-    if 'train/ep_len_mean' in df.columns:
-        ax.plot(df['time/total_timesteps'], df['train/ep_len_mean'])
-        ax.set_title('Episode Length')
-        ax.set_xlabel('Timesteps')
-        ax.set_ylabel('Length')
-        ax.grid(True)
-    
-    # Plot explained variance
-    ax = axes[1, 0]
-    if 'train/explained_variance' in df.columns:
-        ax.plot(df['time/total_timesteps'], df['train/explained_variance'])
-        ax.set_title('Explained Variance')
-        ax.set_xlabel('Timesteps')
-        ax.set_ylabel('Variance')
-        ax.grid(True)
-    
-    # Plot learning rate
-    ax = axes[1, 1]
-    if 'train/learning_rate' in df.columns:
-        ax.plot(df['time/total_timesteps'], df['train/learning_rate'])
-        ax.set_title('Learning Rate')
-        ax.set_xlabel('Timesteps')
-        ax.set_ylabel('Rate')
-        ax.grid(True)
+        ax2.plot(df['time/total_timesteps'], df['train/raw_reward'], label='Raw Reward', color='red')
+        ax2.set_title('Raw Reward Over Time')
+        ax2.set_xlabel('Timesteps')
+        ax2.set_ylabel('Raw Reward')
+        ax2.grid(True)
     
     # Adjust layout and save
     plt.tight_layout()
