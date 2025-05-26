@@ -1,6 +1,6 @@
 import pandas as pd
 from enum import Enum, auto
-
+from typing import Union
 
 
 
@@ -119,6 +119,50 @@ class OHLCVCSVProcessor:
 
         return df_processed
 
+class ExtendedOHLCVCSVProcessor:
+    """
+    CSV 형식의 OHLCV + 기술지표 데이터를 TickStockTradingEnv 등에 입력 가능한
+    pandas.DataFrame으로 가공하는 클래스
+    
+    - timestamp, open, high, low, close, volume, dispersion20, slowK, slowD, MA5, MA20 컬럼 포함
+    - process_mode:
+        - FillWithLast: 가격 및 지표 컬럼의 결측치는 직전 값으로 채우고,
+                        volume 결측치는 0으로 채움
+        - Skip: 결측치가 있는 행은 통째로 제거
+    - 반환된 DataFrame 컬럼 순서:
+        [timestamp, open, high, low, close, volume,
+         dispersion20, slowK, slowD, MA5, MA20]
+    """
+    def __init__(self):
+        # 처리할 기술지표 컬럼명 정의
+        self.tech_cols = ['dispersion20', 'slowK', 'slowD', 'MA5', 'MA20']
+
+    def load_and_process(
+        self,
+        csv_path: str,
+        process_mode: DFProcessMode = DFProcessMode.FillWithLast
+    ) -> pd.DataFrame:
+        # 1) CSV 로드 및 timestamp 파싱
+        df = pd.read_csv(csv_path, parse_dates=['timestamp'])
+
+        # 2) 결측치 처리
+        if process_mode == DFProcessMode.FillWithLast:
+            # 가격(open, high, low, close) + 지표 컬럼을 모두 이전 값으로 채우기
+            price_and_tech = ['open', 'high', 'low', 'close'] + self.tech_cols
+            df[price_and_tech] = df[price_and_tech].fillna(method='ffill')
+            df[price_and_tech] = df[price_and_tech].fillna(method='bfill')
+            # volume은 0으로
+            df['volume'] = df.get('volume', 0).fillna(0)
+        elif process_mode == DFProcessMode.Skip:
+            # 한 행이라도 NaN이 있으면 제거
+            df = df.dropna(subset=['open', 'high', 'low', 'close', 'volume'] + self.tech_cols)
+
+        # 3) 필요한 컬럼만 추출하여 순서 고정
+        output_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume'] + self.tech_cols
+        df_processed = df[output_cols].reset_index(drop=True)
+
+        return df_processed
+
 class MarketDataMerger:
     """
     OHLCVCSVProcessor와 LOBCSVProcessor를 사용해
@@ -128,7 +172,7 @@ class MarketDataMerger:
     def __init__(
         self,
         lob_processor: LOBCSVProcessor,
-        ohlcv_processor: OHLCVCSVProcessor
+        ohlcv_processor: Union[OHLCVCSVProcessor, ExtendedOHLCVCSVProcessor]
     ):
         self.lob_proc   = lob_processor
         self.ohlcv_proc = ohlcv_processor
@@ -303,6 +347,25 @@ def merge_lob_and_ohlcv(lob_csv_path, ohlcv_csv_path):
     
     return df_all
 
+def merge_lob_and_ohlcv_extended(lob_csv_path, ohlcv_extended_csv_path):
+    # 1) 프로세서 인스턴스 생성
+    lob_processor   = LOBCSVProcessor(lob_levels=10)
+    ohlcv_processor = ExtendedOHLCVCSVProcessor()
+
+    # 2) 병합기 생성 및 데이터 병합
+    merger = MarketDataMerger(lob_processor, ohlcv_processor)
+    df_all = merger.merge(
+        lob_csv_path   = lob_csv_path,
+        ohlcv_csv_path = ohlcv_extended_csv_path
+    )
+    
+    # 3) 결과 확인 (상위 5개 행 출력)
+    print("=== Merged Market Data (first 5 rows) ===")
+    pd.set_option('display.max_columns', None)
+    print(df_all.head())
+    print("\n")
+    
+    return df_all
 
 def test_DataSplitter():
     # 앞서 merge_lob_and_ohlcv 로 생성한 df_all 사용 가정
@@ -320,9 +383,11 @@ if __name__ == "__main__":
     # csv_path = "src/db/AAPL_orderbook_mbp-10_data_2025-05-13_1400.csv"
     lob_csv_path = "src/db/AAPL_minute_orderbook_2019_01-07_combined.csv"
     ohlcv_csv_path = "src/db/AAPL_minute_ohlcv_2019_01-07_combined.csv"
+    ohlcv_extended_csv_path = "src/db/indicator/AAPL_with_indicators_v2.csv"
     test_LOBCSVProcessor(lob_csv_path)
     test_OHLCVCSVProcessor(ohlcv_csv_path)
-    merge_lob_and_ohlcv(lob_csv_path, ohlcv_csv_path)
-    test_DataSplitter()
+    # merge_lob_and_ohlcv(lob_csv_path, ohlcv_csv_path)
+    merge_lob_and_ohlcv_extended(lob_csv_path, ohlcv_extended_csv_path)
+    # test_DataSplitter()
 
 

@@ -6,7 +6,7 @@ import pandas as pd
 from src.env.inventory import Inventory
 from src.env.transaction_info import TransactionInfo
 from src.data_handler.csv_processor import merge_lob_and_ohlcv
-from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler
+from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
 from src.env.observation import Observation, InputType
 
 class MinutelyOrderbookOHLCVEnv(gym.Env):
@@ -51,6 +51,8 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
         self.handler = handler_cls(df=self.df, lob_levels=lob_levels, lookback=lookback)
         include_pnl = isinstance(self.handler, (Sc202OHLCVHandler, Sc203OHLCVHandler))
         include_spread = isinstance(self.handler, Sc203OHLCVHandler)
+
+        include_tech = isinstance(self.handler, Sc203OHLCVTechHandler)
         include_ohlcv = True
 
         # Observation 생성
@@ -62,6 +64,7 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
             include_pnl=include_pnl,
             include_spread=include_spread,
             include_ohlcv=include_ohlcv,
+            include_tech=include_tech,
             window_size=window_size
         )
         self.input_type = input_type
