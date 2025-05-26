@@ -40,6 +40,7 @@ class Observation:
         include_pnl: bool      = False,
         include_spread: bool   = False,
         include_ohlcv: bool    = False,
+        include_tech:bool      = False,
         window_size: int       = 1
     ):
         self.lob_levels     = lob_levels
@@ -48,6 +49,7 @@ class Observation:
         self.include_spread = include_spread
         self.include_ohlcv  = include_ohlcv
         self.window_size    = window_size
+        self.include_tech   = include_tech
 
         # 최대 window_size 만큼 과거 관측을 보관
         self.history = deque(maxlen=window_size)
@@ -59,6 +61,7 @@ class Observation:
         self.dim_pnl       = 1 if include_pnl else 0
         self.dim_spread    = 1 if include_spread else 0
         self.dim_ohlcv     = 5 if include_ohlcv else 0
+        self.dim_tech      = 5 if include_tech else 0
 
         self.dim_total = (
             self.dim_snapshots
@@ -67,6 +70,7 @@ class Observation:
             + self.dim_pnl
             + self.dim_spread
             + self.dim_ohlcv
+            + self.dim_tech
         )
 
     def reset(self):
@@ -113,6 +117,10 @@ class Observation:
             ohlcv = features[idx : idx + 5]
             idx += 5
 
+        tech = None
+        if self.include_tech:
+            tech = features[idx:idx+5]; idx += 5
+
         self.history.append({
             'snapshots': np.array(snap, dtype=float),
             'current':   np.array(curr, dtype=float),
@@ -120,6 +128,7 @@ class Observation:
             **({'pnl': float(pnl)}       if self.include_pnl    else {}),
             **({'spread': float(spread)} if self.include_spread else {}),
             **({'ohlcv': np.array(ohlcv, dtype=float)} if self.include_ohlcv else {}),
+            **({'tech': np.array(tech)}   if self.include_tech  else {})
         })
 
     def get_mlp_input(self) -> np.ndarray:
@@ -140,6 +149,8 @@ class Observation:
             parts.append(np.array([h['spread']], dtype=float))
         if self.include_ohlcv:
             parts.append(h['ohlcv'])
+        if self.include_tech:
+            parts.append(h['tech'])
         return np.concatenate(parts, axis=0)
 
     # def get_lstm_input(self) -> np.ndarray:
@@ -175,6 +186,7 @@ class Observation:
             if self.include_pnl:    rest.append(np.array([h['pnl']], dtype=float))
             if self.include_spread: rest.append(np.array([h['spread']], dtype=float))
             if self.include_ohlcv:  rest.append(h['ohlcv'])
+            if self.include_tech:   rest.append(h['tech'])
             part2 = np.concatenate(rest, axis=0)
             snaps_list.append(part1)
             others_list.append(part2)
