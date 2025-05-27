@@ -83,6 +83,257 @@ class TrainingMetricsCallback(BaseCallback):
         }
 
 
+def classify_action(action, hold_threshold=0.2, h_max=250):
+    """
+    Classify continuous action into Buy/Hold/Sell based on environment logic
+    
+    Args:
+        action: Raw action from model (-1 to 1)
+        hold_threshold: Threshold for hold action
+        h_max: Maximum action multiplier
+    
+    Returns:
+        str: 'Buy', 'Hold', or 'Sell'
+    """
+    act = float(np.clip(action, -1.0, 1.0))
+    
+    # Hold 판정: abs(act) < hold_threshold
+    if abs(act) < hold_threshold:
+        real_act = 0  # Hold
+    else:
+        real_act = int(np.rint(act * h_max))
+    
+    # 최종 행동 분류
+    if real_act < 0:
+        return 'Sell'
+    elif real_act > 0:
+        return 'Buy'
+    else:
+        return 'Hold'
+
+
+def calculate_action_statistics(actions, hold_threshold=0.2, h_max=250):
+    """
+    Calculate action distribution statistics
+    
+    Args:
+        actions: List of raw actions from model
+        hold_threshold: Hold threshold from environment
+        h_max: Max action multiplier from environment
+        
+    Returns:
+        dict: Action statistics including counts and percentages
+    """
+    action_types = [classify_action(action, hold_threshold, h_max) for action in actions]
+    
+    buy_count = action_types.count('Buy')
+    hold_count = action_types.count('Hold')
+    sell_count = action_types.count('Sell')
+    total_count = len(action_types)
+    
+    return {
+        'action_types': action_types,
+        'buy_count': buy_count,
+        'hold_count': hold_count,
+        'sell_count': sell_count,
+        'total_count': total_count,
+        'buy_ratio': buy_count / total_count if total_count > 0 else 0,
+        'hold_ratio': hold_count / total_count if total_count > 0 else 0,
+        'sell_ratio': sell_count / total_count if total_count > 0 else 0,
+        'raw_actions': actions
+    }
+
+
+def plot_action_analysis(action_stats, dataset_name, save_path=None):
+    """
+    Create comprehensive action analysis visualization
+    
+    Args:
+        action_stats: Action statistics from calculate_action_statistics
+        dataset_name: Name of dataset for titles
+        save_path: Path to save the plot
+    """
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    fig.suptitle(f'Action Analysis - {dataset_name}', fontsize=16, fontweight='bold')
+    
+    # Color scheme
+    colors = {
+        'Buy': '#2E8B57',    # Green
+        'Hold': '#FFD700',   # Gold  
+        'Sell': '#DC143C'    # Red
+    }
+    
+    # 1. Action Distribution Pie Chart
+    ax1 = axes[0, 0]
+    sizes = [action_stats['buy_ratio'], action_stats['hold_ratio'], action_stats['sell_ratio']]
+    labels = ['Buy', 'Hold', 'Sell']
+    colors_pie = [colors['Buy'], colors['Hold'], colors['Sell']]
+    
+    wedges, texts, autotexts = ax1.pie(sizes, labels=labels, autopct='%1.1f%%', 
+                                      colors=colors_pie, startangle=90)
+    ax1.set_title('Action Distribution', fontweight='bold')
+    
+    # Make percentage text bold and larger
+    for autotext in autotexts:
+        autotext.set_color('white')
+        autotext.set_fontweight('bold')
+        autotext.set_fontsize(11)
+    
+    # 2. Action Counts Bar Chart
+    ax2 = axes[0, 1]
+    counts = [action_stats['buy_count'], action_stats['hold_count'], action_stats['sell_count']]
+    bars = ax2.bar(labels, counts, color=[colors['Buy'], colors['Hold'], colors['Sell']], alpha=0.8)
+    ax2.set_title('Action Counts', fontweight='bold')
+    ax2.set_ylabel('Count')
+    ax2.grid(True, alpha=0.3)
+    
+    # Add value labels on bars
+    for bar, count in zip(bars, counts):
+        height = bar.get_height()
+        ax2.text(bar.get_x() + bar.get_width()/2., height + max(counts)*0.01,
+                f'{count}', ha='center', va='bottom', fontweight='bold')
+    
+    # 3. Action Time Series
+    ax3 = axes[0, 2]
+    action_types = action_stats['action_types']
+    action_numeric = []
+    for action in action_types:
+        if action == 'Buy':
+            action_numeric.append(1)
+        elif action == 'Sell':
+            action_numeric.append(-1)
+        else:  # Hold
+            action_numeric.append(0)
+    
+    # Create color map for time series
+    color_map = []
+    for action in action_types:
+        color_map.append(colors[action])
+    
+    ax3.scatter(range(len(action_numeric)), action_numeric, c=color_map, alpha=0.6, s=10)
+    ax3.set_title('Actions Over Time', fontweight='bold')
+    ax3.set_xlabel('Time Step')
+    ax3.set_ylabel('Action Type')
+    ax3.set_yticks([-1, 0, 1])
+    ax3.set_yticklabels(['Sell', 'Hold', 'Buy'])
+    ax3.grid(True, alpha=0.3)
+    
+    # 4. Raw Action Distribution
+    ax4 = axes[1, 0]
+    raw_actions = action_stats['raw_actions']
+    ax4.hist(raw_actions, bins=50, alpha=0.7, color='skyblue', density=True, edgecolor='black')
+    ax4.axvline(np.mean(raw_actions), color='red', linestyle='--', 
+               label=f'Mean: {np.mean(raw_actions):.3f}')
+    ax4.axvline(np.median(raw_actions), color='orange', linestyle='--', 
+               label=f'Median: {np.median(raw_actions):.3f}')
+    ax4.set_title('Raw Action Values Distribution', fontweight='bold')
+    ax4.set_xlabel('Raw Action Value')
+    ax4.set_ylabel('Density')
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+    
+    # 5. Running Action Ratios
+    ax5 = axes[1, 1]
+    window_size = max(50, len(action_types) // 20)  # Adaptive window size
+    
+    if len(action_types) > window_size:
+        running_buy = []
+        running_hold = []
+        running_sell = []
+        
+        for i in range(window_size, len(action_types) + 1):
+            window_actions = action_types[i-window_size:i]
+            buy_ratio = window_actions.count('Buy') / window_size
+            hold_ratio = window_actions.count('Hold') / window_size
+            sell_ratio = window_actions.count('Sell') / window_size
+            
+            running_buy.append(buy_ratio)
+            running_hold.append(hold_ratio)
+            running_sell.append(sell_ratio)
+        
+        x_range = range(window_size, len(action_types) + 1)
+        ax5.plot(x_range, running_buy, label='Buy', color=colors['Buy'], linewidth=2)
+        ax5.plot(x_range, running_hold, label='Hold', color=colors['Hold'], linewidth=2)
+        ax5.plot(x_range, running_sell, label='Sell', color=colors['Sell'], linewidth=2)
+        ax5.set_title(f'Running Action Ratios (Window: {window_size})', fontweight='bold')
+        ax5.set_xlabel('Time Step')
+        ax5.set_ylabel('Ratio')
+        ax5.legend()
+        ax5.grid(True, alpha=0.3)
+    else:
+        ax5.text(0.5, 0.5, 'Insufficient data for\nrunning ratios', 
+                ha='center', va='center', transform=ax5.transAxes)
+        ax5.set_title('Running Action Ratios', fontweight='bold')
+    
+    # 6. Action Statistics Table
+    ax6 = axes[1, 2]
+    ax6.axis('off')
+    
+    stats_data = [
+        ['Action', 'Count', 'Ratio', 'Percentage'],
+        ['Buy', f'{action_stats["buy_count"]}', f'{action_stats["buy_ratio"]:.3f}', f'{action_stats["buy_ratio"]*100:.1f}%'],
+        ['Hold', f'{action_stats["hold_count"]}', f'{action_stats["hold_ratio"]:.3f}', f'{action_stats["hold_ratio"]*100:.1f}%'],
+        ['Sell', f'{action_stats["sell_count"]}', f'{action_stats["sell_ratio"]:.3f}', f'{action_stats["sell_ratio"]*100:.1f}%'],
+        ['Total', f'{action_stats["total_count"]}', '1.000', '100.0%']
+    ]
+    
+    table = ax6.table(cellText=stats_data[1:], colLabels=stats_data[0],
+                     cellLoc='center', loc='center',
+                     colWidths=[0.2, 0.2, 0.25, 0.25])
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.2, 1.8)
+    
+    # Style the table
+    for i in range(len(stats_data[0])):
+        table[(0, i)].set_facecolor('#4CAF50')
+        table[(0, i)].set_text_props(weight='bold', color='white')
+    
+    # Color code action rows
+    for i in range(1, len(stats_data) - 1):  # Exclude total row
+        action_name = stats_data[i][0]
+        if action_name in colors:
+            for j in range(len(stats_data[0])):
+                table[(i, j)].set_facecolor(colors[action_name])
+                table[(i, j)].set_alpha(0.3)
+    
+    # Style total row
+    for j in range(len(stats_data[0])):
+        table[(len(stats_data) - 1, j)].set_facecolor('#E0E0E0')
+        table[(len(stats_data) - 1, j)].set_text_props(weight='bold')
+    
+    ax6.set_title('Action Statistics Summary', fontweight='bold', pad=20)
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"📊 Action analysis saved as '{save_path}'")
+    
+    plt.show()
+    
+    # Print action insights
+    print(f"\n🎯 Action Analysis Insights - {dataset_name}")
+    print("="*50)
+    print(f"Most frequent action: {max(labels, key=lambda x: action_stats[f'{x.lower()}_count'])}")
+    print(f"Action diversity: {1 - max(sizes):.3f} (closer to 1 = more diverse)")
+    
+    if action_stats['buy_ratio'] > 0.4:
+        print("📈 Aggressive buying strategy detected")
+    elif action_stats['sell_ratio'] > 0.4:
+        print("📉 Aggressive selling strategy detected")
+    elif action_stats['hold_ratio'] > 0.6:
+        print("⏸️  Conservative holding strategy detected")
+    else:
+        print("⚖️  Balanced trading strategy")
+    
+    print(f"Raw action statistics:")
+    print(f"  Mean: {np.mean(raw_actions):.4f}")
+    print(f"  Std: {np.std(raw_actions):.4f}")
+    print(f"  Min: {np.min(raw_actions):.4f}")
+    print(f"  Max: {np.max(raw_actions):.4f}")
+
+
 def calculate_financial_metrics(step_rewards, cumulative_rewards, portfolio_values, initial_cash=100000):
     """
     Calculate comprehensive financial performance metrics using actual portfolio values
@@ -123,7 +374,7 @@ def calculate_financial_metrics(step_rewards, cumulative_rewards, portfolio_valu
     # Calmar Ratio
     calmar_ratio = annualized_return / abs(max_drawdown) if max_drawdown != 0 else 0
     
-    # Win/Loss Analysis
+    # Win/Loss Analysis - Fixed to use portfolio returns instead of step rewards
     positive_returns = returns[returns > 0]
     negative_returns = returns[returns < 0]
     
@@ -139,7 +390,7 @@ def calculate_financial_metrics(step_rewards, cumulative_rewards, portfolio_valu
     
     # Skewness and Kurtosis
     skewness = stats.skew(returns) if len(returns) > 3 else 0
-    kurtosis = stats.kurtosis(returns) if len(returns) > 3 else 0
+    kurtosis_val = stats.kurtosis(returns) if len(returns) > 3 else 0
     
     return {
         'total_return': total_return,
@@ -156,7 +407,7 @@ def calculate_financial_metrics(step_rewards, cumulative_rewards, portfolio_valu
         'var_95': var_95,
         'cvar_95': cvar_95,
         'skewness': skewness,
-        'kurtosis': kurtosis,
+        'kurtosis': kurtosis_val,
         'portfolio_values': portfolio_values,
         'returns': returns,
         'drawdown': drawdown,
@@ -176,9 +427,9 @@ def calculate_sortino_ratio(returns, target_return=0):
     return (np.mean(excess_returns) * 252) / (downside_deviation * np.sqrt(252))
 
 
-def plot_comprehensive_financial_analysis(metrics, dataset_name, save_path=None):
+def plot_comprehensive_financial_analysis(metrics, dataset_name, action_stats=None, save_path=None):
     """
-    Create comprehensive financial performance visualization
+    Create comprehensive financial performance visualization with optional action analysis
     """
     if metrics is None:
         print("⚠️ No metrics available for visualization")
@@ -225,7 +476,7 @@ def plot_comprehensive_financial_analysis(metrics, dataset_name, save_path=None)
                 xy=(min_idx, min_value), xytext=(min_idx, min_value - (max_value-min_value)*0.1),
                 arrowprops=dict(arrowstyle='->', color=colors['danger']), fontsize=10)
     
-    # 2. Drawdown Analysis
+    # 2. Drawdown Analysis (항상 MDD 분석 표시)
     ax2 = fig.add_subplot(gs[0, 2:])
     ax2.fill_between(range(len(metrics['drawdown'])), metrics['drawdown'], 0, 
                      alpha=0.7, color=colors['danger'], label='Drawdown')
@@ -407,6 +658,7 @@ def plot_comprehensive_financial_analysis(metrics, dataset_name, save_path=None)
     ax10.axis('off')
     
     profit_factor_str = "∞" if metrics['profit_factor'] == np.inf else f"{metrics['profit_factor']:.2f}"
+    
     # Create performance summary text
     summary_text = f"""
     📊 PERFORMANCE SUMMARY - {dataset_name}
@@ -431,6 +683,15 @@ def plot_comprehensive_financial_analysis(metrics, dataset_name, save_path=None)
     • Kurtosis: {metrics['kurtosis']:.3f}
     • VaR 95%: {metrics['var_95']:.4f}
     """
+    
+    if action_stats:
+        summary_text += f"""
+    
+    🎯 Action Distribution:
+    • Buy: {action_stats['buy_ratio']:.1%}
+    • Hold: {action_stats['hold_ratio']:.1%}
+    • Sell: {action_stats['sell_ratio']:.1%}
+        """
     
     ax10.text(0.05, 0.95, summary_text, transform=ax10.transAxes, fontsize=11,
              verticalalignment='top', fontfamily='monospace',
@@ -750,7 +1011,7 @@ def compare_performance(val_results, test_results, save_directory):
 
 def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100000):
     """
-    Enhanced evaluation with comprehensive financial metrics using actual portfolio values
+    Enhanced evaluation with comprehensive financial metrics and action analysis
     """
     print(f"\n📈 Enhanced Evaluation on {dataset_name} Dataset")
     print("-" * 50)
@@ -758,14 +1019,20 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
     all_episode_rewards = []
     all_step_rewards = []
     all_cumulative_rewards = []
-    all_portfolio_values = []  # 실제 포트폴리오 가치 추적
+    all_portfolio_values = []
+    all_actions = []  # Track raw actions for analysis
+    
+    # Get environment parameters for action classification
+    hold_threshold = getattr(env, 'hold_threshold', 0.2)
+    h_max = getattr(env, 'h_max', 250)
     
     for episode in range(num_episodes):
         obs = env.reset()
         episode_reward = 0
         episode_step_rewards = []
         episode_cumulative_rewards = []
-        episode_portfolio_values = []  # 에피소드별 포트폴리오 가치
+        episode_portfolio_values = []
+        episode_actions = []
         done = False
         step = 0
         
@@ -782,6 +1049,10 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         while not done:
             # Use the model to predict the next action (evaluation mode)
             action, _states = model.predict(obs, deterministic=True)
+            
+            # Record raw action for analysis
+            raw_action = float(action[0]) if hasattr(action, '__len__') else float(action)
+            episode_actions.append(raw_action)
             
             # Take the action in the environment
             obs, reward, done, info = env.step(action)
@@ -801,7 +1072,8 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
             pbar.set_postfix({
                 'Reward': f'{reward:.4f}', 
                 'Cumulative': f'{episode_reward:.4f}',
-                'Portfolio': f'${portfolio_value:,.0f}'
+                'Portfolio': f'${portfolio_value:,.0f}',
+                'Action': f'{raw_action:.3f}'
             })
         
         pbar.close()
@@ -810,6 +1082,7 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         all_step_rewards.append(episode_step_rewards)
         all_cumulative_rewards.append(episode_cumulative_rewards)
         all_portfolio_values.append(episode_portfolio_values)
+        all_actions.extend(episode_actions)  # Flatten all actions
         
         final_portfolio_value = episode_portfolio_values[-1]
         portfolio_return = (final_portfolio_value - initial_cash) / initial_cash
@@ -818,6 +1091,15 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         print(f"   Total reward: {episode_reward:.4f}")
         print(f"   Portfolio value: ${final_portfolio_value:,.2f}")
         print(f"   Portfolio return: {portfolio_return:.2%}")
+        print(f"   Total actions taken: {len(episode_actions)}")
+    
+    # Calculate action statistics
+    print(f"\n🎯 Calculating action distribution...")
+    action_stats = calculate_action_statistics(all_actions, hold_threshold, h_max)
+    
+    # Create action analysis visualization
+    action_save_path = f'action_analysis_{dataset_name.lower()}.png'
+    plot_action_analysis(action_stats, dataset_name, action_save_path)
     
     # Calculate comprehensive financial metrics using actual portfolio values
     print(f"\n🔬 Calculating comprehensive financial metrics using actual portfolio values...")
@@ -831,9 +1113,9 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
     metrics = calculate_financial_metrics(step_rewards, cumulative_rewards, portfolio_values, initial_cash)
     
     if metrics:
-        # Create comprehensive visualization
+        # Create comprehensive visualization with action stats
         save_path = f'comprehensive_analysis_{dataset_name.lower()}.png'
-        plot_comprehensive_financial_analysis(metrics, dataset_name, save_path)
+        plot_comprehensive_financial_analysis(metrics, dataset_name, action_stats, save_path)
         
         # Print detailed metrics
         print(f"\n📊 Detailed Financial Metrics - {dataset_name} (Portfolio-Based)")
@@ -904,8 +1186,9 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         'episode_rewards': all_episode_rewards,
         'step_rewards': all_step_rewards, 
         'cumulative_rewards': all_cumulative_rewards,
-        'portfolio_values': all_portfolio_values,  # 추가: 실제 포트폴리오 가치
+        'portfolio_values': all_portfolio_values,
         'avg_reward': avg_reward,
         'std_reward': std_reward,
-        'financial_metrics': metrics
+        'financial_metrics': metrics,
+        'action_stats': action_stats  # 추가: 행동 통계
     }
