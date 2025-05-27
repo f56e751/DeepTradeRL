@@ -23,6 +23,8 @@ from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, 
 from src.env.observation import Observation, InputType
 from src.data_handler.csv_processor import merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter
 from src.infrastructure.callback import TrainingStatusCallback
+from src.agent.wrapper import LSTMObsWrapper, load_pretrained_lstm
+from src.deeplob.model import deeplob
 
 def main(args):
     if args.seed is None:
@@ -49,19 +51,28 @@ def main(args):
     splitter = DataSplitter(train_ratio=0.7, val_ratio=0.2, test_ratio=0.1)
     df_train, df_val, df_test = splitter.split(df_all)
     
+    # handler_cls 선택
+    handler = Sc203OHLCVTechHandler if args.include_tech else Sc203OHLCVHandler
+
     # 틱 단위 거래 환경 생성
-    env = MinutelyOrderbookOHLCVEnv(
+    default_env = MinutelyOrderbookOHLCVEnv(
         df=df_train,
-        handler_cls=Sc203OHLCVTechHandler,
+        handler_cls=handler,
         initial_cash=args.initial_cash, # Starting cash
         lob_levels=args.lob_levels,                     # Max shares to trade
         lookback=args.lookback,
         window_size=args.window_size,
-        input_type=InputType.MLP,
+        input_type=InputType[args.input_type],
         transaction_fee=args.transaction_fee,
         h_max=args.h_max,
         hold_threshold=args.hold_threshold
     )
+
+    if InputType[args.input_type] == InputType.LSTM:
+        pretrained_lstm = load_pretrained_lstm()
+        env = LSTMObsWrapper(default_env, pretrained_lstm, args.window_size, device=device)
+    elif InputType[args.input_type] == InputType.MLP:
+        env = default_env
 
     train_agent(env, save_directory, device, args)
 
@@ -129,10 +140,12 @@ if __name__ == '__main__':
                         required=False, help='Max action')
     parser.add_argument("--hold_threshold", type=float, default=0.2,
                         required=False, help='Hold threshold')
-    parser.add_argument("--window_size", type=int, default=9,
+    parser.add_argument("--window_size", type=int, default=100,
                         required=False, help='Window size')
     parser.add_argument("--transaction_fee", type=float, default=0.0023,
                         required=False, help='Transaction fee')
+    parser.add_argument("--input_type", type=str, choices=["MLP", "LSTM"], default="MLP",
+                        required=False, help="Type of observation to use: MLP or LSTM")
 
     # GPU related arguments
     parser.add_argument("--no_gpu", "-ngpu", action="store_true")

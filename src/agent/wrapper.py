@@ -25,14 +25,18 @@ class LSTMObsWrapper(gym.Wrapper):
 
         # env.observation_space이 Dict인 걸 확인
         assert isinstance(env.observation_space, gym.spaces.Dict)
-        T_raw, D_snap = env.observation_space.spaces['snapshots'].shape
-        _, D_others = env.observation_space.spaces['others'].shape
-
+        # LSTM 입력용 시퀀스 크기와 MLP 입력 벡터 크기 가져오기
+        T_raw, D_snap = env.observation_space.spaces['lstm_snapshots'].shape
+        D_mlp         = env.observation_space.spaces['mlp_input'].shape[0]
+        
         # DeepLOB 내부 LSTM hidden_size
         H = self.pretrained.lstm.hidden_size
+        # 최종 반환 차원 = LSTM 피처(H) + MLP 피처(D_mlp)
+        total_dim     = H + D_mlp
 
-        # wrapper가 최종 반환할 벡터 차원
-        total_dim = H + (T_raw * D_others)
+
+
+
         self.observation_space = gym.spaces.Box(
             low=-np.inf, high=np.inf,
             shape=(total_dim,), dtype=np.float32
@@ -49,7 +53,7 @@ class LSTMObsWrapper(gym.Wrapper):
 
     def _make_obs(self, obs_dict):
         # --- 1) 패딩하여 (T₀, D_snap) 로 맞추기 ---
-        snaps = obs_dict['snapshots']            # (T_raw, D_snap)
+        snaps = obs_dict['lstm_snapshots']            # (T_raw, D_snap)
         T_raw, D_snap = snaps.shape
         if T_raw < self.train_seq_len:
             pad_len = self.train_seq_len - T_raw
@@ -87,10 +91,27 @@ class LSTMObsWrapper(gym.Wrapper):
         feats_lstm = lstm_out[:, -1, :].squeeze(0).cpu().numpy()
 
         # --- 3) others flatten ---
-        flat_others = obs_dict['others'].reshape(-1)
+        vec_mlp = obs_dict['mlp_input']
 
         # --- 4) concat & 반환 ---
-        return np.concatenate([feats_lstm, flat_others], axis=0)
+        return np.concatenate([feats_lstm, vec_mlp], axis=0)
+
+
+def load_pretrained_lstm():
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    pretrained_lstm = torch.load(
+        "src/deeplob/best_pretrained_deeplob",
+        map_location=device,
+        weights_only=False
+    )
+    pretrained_lstm.to(device).eval()
+
+    # 파라미터 업데이트 방지
+    for param in pretrained_lstm.parameters():
+        param.requires_grad = False
+
+    return pretrained_lstm
+
 
 # 사용 예:
 # env = MinutelyOrderbookOHLCVEnv(..., input_type=InputType.LSTM)
@@ -120,13 +141,9 @@ if __name__ == "__main__":
     )
 
     # 3) Pretrained LSTM 모델 로드 (모델 전체)
+    pretrained_lstm = load_pretrained_lstm()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    pretrained_lstm = torch.load(
-        "src/deeplob/best_pretrained_deeplob",
-        map_location=device,
-        weights_only=False    # <-- 명시적으로 False
-    )
-    pretrained_lstm.to(device).eval()
+
 
     # 4) Wrapper 적용
     wrapped_env = LSTMObsWrapper(env, 
