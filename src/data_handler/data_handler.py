@@ -448,17 +448,31 @@ class Sc203OHLCVHandler(TickDataHandlerBase):
 
 
 
+class Sc203OHLCVTechHandler(Sc203OHLCVHandler):
+    """
+    Sc203OHLCVHandler 기능에 추가 기술지표(dispersion20, slowK, slowD, MA5, MA20)를 덧붙인 핸들러
+    """
+    def __init__(self, df, lob_levels=10, lookback=9):
+        super().__init__(df, lob_levels, lookback)
 
+    def get_additional_features(
+        self,
+        step: int,
+        position: int,
+        pnl: float = 0.0,
+        **kwargs
+    ) -> list:
+        # 1) Sc203OHLCVHandler의 모든 피처 불러오기
+        features = super().get_additional_features(step, position, pnl, **kwargs)
 
+        # 2) 추가 기술지표 컬럼들
+        tech_cols = ["dispersion20", "slowK", "slowD", "MA5", "MA20"]
+        row = self.df.iloc[step]
+        for col in tech_cols:
+            # 기본값 0.0을 사용해 안전하게 append
+            features.append(row.get(col, 0.0))
 
-
-
-
-
-
-
-
-
+        return features
 
 
 
