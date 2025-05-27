@@ -3,6 +3,12 @@ from gym import spaces
 import numpy as np
 import pandas as pd
 
+import sys
+import os
+
+# Add the src directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from src.env.inventory import Inventory
 from src.env.transaction_info import TransactionInfo
 from src.data_handler.csv_processor import merge_lob_and_ohlcv
@@ -151,7 +157,8 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
         if self.input_type == InputType.MLP:
             return self.observation.get_mlp_input()
         # LSTM인 경우 dict 형태로 반환
-        return self.observation.get_lstm_input()
+        lstm_dict = self.observation.get_lstm_input()
+        return lstm_dict
 
     def step(self, action):
         """연속 액션 실행 및 보상 계산"""

@@ -23,6 +23,7 @@ from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, 
 from src.env.observation import Observation, InputType
 from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
 from src.infrastructure.callback import TrainingStatusCallback
+from src.agent.wrapper import LSTMObsWrapper
 
 def main(args):
     if args.seed is None:
@@ -46,7 +47,7 @@ def main(args):
     df_train, df_val, df_test = splitter.split(df_all)
     
     # 틱 단위 거래 환경 생성
-    env = MinutelyOrderbookOHLCVEnv(
+    env_original = MinutelyOrderbookOHLCVEnv(
         df=df_train,
         handler_cls=Sc203OHLCVHandler,
         initial_cash=args.initial_cash, # Starting cash
@@ -58,8 +59,21 @@ def main(args):
         h_max=args.h_max,
         hold_threshold=args.hold_threshold
     )
+    
+    # Pretrained LSTM 모델 로드 (모델 전체)
+    pretrained_lstm = torch.load(
+        "src/deeplob/best_pretrained_deeplob",
+        map_location=device,
+        weights_only=False    # <-- 명시적으로 False
+    )
 
-    train_agent(env, save_directory, device, args)
+    # Wrapper 적용
+    wrapped_env = LSTMObsWrapper(env_original, 
+                                pretrained_lstm, 
+                                train_seq_len=100, 
+                                device=device)
+
+    train_agent(wrapped_env, save_directory, device, args)
 
 
 def train_agent(env, save_directory, device, args):
