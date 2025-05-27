@@ -83,27 +83,36 @@ class TrainingMetricsCallback(BaseCallback):
         }
 
 
-def calculate_financial_metrics(step_rewards, cumulative_rewards, initial_cash=100000):
+def calculate_financial_metrics(step_rewards, cumulative_rewards, portfolio_values, initial_cash=100000):
     """
-    Calculate comprehensive financial performance metrics
+    Calculate comprehensive financial performance metrics using actual portfolio values
+    
+    Args:
+        step_rewards: Step-wise rewards from environment
+        cumulative_rewards: Cumulative rewards 
+        portfolio_values: Actual portfolio values from get_portfolio_value()
+        initial_cash: Initial cash amount
     """
     step_rewards = np.array(step_rewards)
     cumulative_rewards = np.array(cumulative_rewards)
+    portfolio_values = np.array(portfolio_values)
     
-    # Convert rewards to returns (assuming rewards represent P&L)
-    portfolio_values = initial_cash + cumulative_rewards
+    if len(portfolio_values) <= 1:
+        return None
+    
+    # Calculate returns based on actual portfolio values
     returns = np.diff(portfolio_values) / portfolio_values[:-1]
     returns = returns[~np.isnan(returns)]  # Remove NaN values
     
     if len(returns) == 0:
         return None
     
-    # Basic Performance Metrics
+    # Basic Performance Metrics using actual portfolio values
     total_return = (portfolio_values[-1] - initial_cash) / initial_cash
     annualized_return = (1 + total_return) ** (252 / len(returns)) - 1  # Assuming daily data
     volatility = np.std(returns) * np.sqrt(252)  # Annualized volatility
     
-    # Maximum Drawdown (MDD)
+    # Maximum Drawdown (MDD) based on actual portfolio values
     peak = np.maximum.accumulate(portfolio_values)
     drawdown = (portfolio_values - peak) / peak
     max_drawdown = np.min(drawdown)
@@ -192,12 +201,12 @@ def plot_comprehensive_financial_analysis(metrics, dataset_name, save_path=None)
         'danger': '#FF8E53'
     }
     
-    # 1. Portfolio Value Over Time
+    # 1. Portfolio Value Over Time (using actual portfolio values)
     ax1 = fig.add_subplot(gs[0, :2])
     ax1.plot(metrics['portfolio_values'], linewidth=2, color=colors['primary'], label='Portfolio Value')
     initial_value = metrics['portfolio_values'][0]
     ax1.axhline(y=initial_value, color='gray', linestyle='--', alpha=0.7, label='Initial Value')
-    ax1.set_title(f'{dataset_name} - Portfolio Value Over Time', fontsize=14, fontweight='bold')
+    ax1.set_title(f'{dataset_name} - Portfolio Value Over Time (Actual)', fontsize=14, fontweight='bold')
     ax1.set_xlabel('Time Step')
     ax1.set_ylabel('Portfolio Value ($)')
     ax1.legend()
@@ -402,7 +411,7 @@ def plot_comprehensive_financial_analysis(metrics, dataset_name, save_path=None)
     summary_text = f"""
     📊 PERFORMANCE SUMMARY - {dataset_name}
     
-    🎯 Overall Performance:
+    🎯 Overall Performance (Actual Portfolio Values):
     • Total Return: {metrics['total_return']:.2%}
     • Annualized Return: {metrics['annualized_return']:.2%}
     • Volatility: {metrics['volatility']:.2%}
@@ -428,7 +437,7 @@ def plot_comprehensive_financial_analysis(metrics, dataset_name, save_path=None)
              bbox=dict(boxstyle="round,pad=0.5", facecolor=colors['accent'], alpha=0.1))
     
     # Overall title
-    fig.suptitle(f'Comprehensive Financial Analysis - {dataset_name}', 
+    fig.suptitle(f'Comprehensive Financial Analysis - {dataset_name} (Portfolio-Based)', 
                 fontsize=16, fontweight='bold', y=0.98)
     
     # Save the plot
@@ -653,16 +662,16 @@ def compare_performance(val_results, test_results, save_directory):
         axes[0, 0].text(i, avg + std + 0.01, f'{avg:.3f}', 
                        ha='center', va='bottom', fontweight='bold')
     
-    # Plot 2: Cumulative rewards comparison (if single episode)
-    if len(val_results['cumulative_rewards']) == 1 and len(test_results['cumulative_rewards']) == 1:
-        val_cum = val_results['cumulative_rewards'][0]
-        test_cum = test_results['cumulative_rewards'][0]
+    # Plot 2: Portfolio values comparison (if single episode)
+    if len(val_results['portfolio_values']) == 1 and len(test_results['portfolio_values']) == 1:
+        val_portfolio = val_results['portfolio_values'][0]
+        test_portfolio = test_results['portfolio_values'][0]
         
-        axes[0, 1].plot(val_cum, label='Validation', linewidth=2, color='skyblue')
-        axes[0, 1].plot(test_cum, label='Test', linewidth=2, color='lightcoral')
-        axes[0, 1].set_title('Cumulative Rewards Over Time', fontweight='bold')
+        axes[0, 1].plot(val_portfolio, label='Validation', linewidth=2, color='skyblue')
+        axes[0, 1].plot(test_portfolio, label='Test', linewidth=2, color='lightcoral')
+        axes[0, 1].set_title('Portfolio Values Over Time', fontweight='bold')
         axes[0, 1].set_xlabel('Step')
-        axes[0, 1].set_ylabel('Cumulative Reward')
+        axes[0, 1].set_ylabel('Portfolio Value ($)')
         axes[0, 1].legend()
         axes[0, 1].grid(True, alpha=0.3)
     
@@ -741,7 +750,7 @@ def compare_performance(val_results, test_results, save_directory):
 
 def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100000):
     """
-    Enhanced evaluation with comprehensive financial metrics
+    Enhanced evaluation with comprehensive financial metrics using actual portfolio values
     """
     print(f"\n📈 Enhanced Evaluation on {dataset_name} Dataset")
     print("-" * 50)
@@ -749,16 +758,23 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
     all_episode_rewards = []
     all_step_rewards = []
     all_cumulative_rewards = []
+    all_portfolio_values = []  # 실제 포트폴리오 가치 추적
     
     for episode in range(num_episodes):
         obs = env.reset()
         episode_reward = 0
         episode_step_rewards = []
         episode_cumulative_rewards = []
+        episode_portfolio_values = []  # 에피소드별 포트폴리오 가치
         done = False
         step = 0
         
         print(f"Episode {episode + 1}/{num_episodes} - {dataset_name}")
+        
+        # 초기 포트폴리오 가치 기록
+        mid_price = env._get_mid_price()
+        initial_portfolio_value = env.inventory.get_portfolio_value({'TICKER': mid_price})
+        episode_portfolio_values.append(initial_portfolio_value)
         
         # Use tqdm for progress bar
         pbar = tqdm(desc=f"Steps", unit="step")
@@ -770,16 +786,22 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
             # Take the action in the environment
             obs, reward, done, info = env.step(action)
             
-            # Record rewards
+            # Record step rewards
             episode_step_rewards.append(reward)
             episode_reward += reward
             episode_cumulative_rewards.append(episode_reward)
+            
+            # Record actual portfolio value using mid price
+            mid_price = env._get_mid_price()
+            portfolio_value = env.inventory.get_portfolio_value({'TICKER': mid_price})
+            episode_portfolio_values.append(portfolio_value)
             
             step += 1
             pbar.update(1)
             pbar.set_postfix({
                 'Reward': f'{reward:.4f}', 
-                'Cumulative': f'{episode_reward:.4f}'
+                'Cumulative': f'{episode_reward:.4f}',
+                'Portfolio': f'${portfolio_value:,.0f}'
             })
         
         pbar.close()
@@ -787,17 +809,26 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         all_episode_rewards.append(episode_reward)
         all_step_rewards.append(episode_step_rewards)
         all_cumulative_rewards.append(episode_cumulative_rewards)
+        all_portfolio_values.append(episode_portfolio_values)
         
-        print(f"✅ Episode {episode + 1} finished - Total reward: {episode_reward:.4f}")
+        final_portfolio_value = episode_portfolio_values[-1]
+        portfolio_return = (final_portfolio_value - initial_cash) / initial_cash
+        
+        print(f"✅ Episode {episode + 1} finished")
+        print(f"   Total reward: {episode_reward:.4f}")
+        print(f"   Portfolio value: ${final_portfolio_value:,.2f}")
+        print(f"   Portfolio return: {portfolio_return:.2%}")
     
-    # Calculate comprehensive financial metrics
-    print(f"\n🔬 Calculating comprehensive financial metrics...")
+    # Calculate comprehensive financial metrics using actual portfolio values
+    print(f"\n🔬 Calculating comprehensive financial metrics using actual portfolio values...")
     
     # Use first episode data for detailed analysis
     step_rewards = all_step_rewards[0]
     cumulative_rewards = all_cumulative_rewards[0]
+    portfolio_values = all_portfolio_values[0]
     
-    metrics = calculate_financial_metrics(step_rewards, cumulative_rewards, initial_cash)
+    # Calculate metrics with actual portfolio values
+    metrics = calculate_financial_metrics(step_rewards, cumulative_rewards, portfolio_values, initial_cash)
     
     if metrics:
         # Create comprehensive visualization
@@ -805,9 +836,14 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         plot_comprehensive_financial_analysis(metrics, dataset_name, save_path)
         
         # Print detailed metrics
-        print(f"\n📊 Detailed Financial Metrics - {dataset_name}")
-        print("="*60)
-        print(f"📈 Return Metrics:")
+        print(f"\n📊 Detailed Financial Metrics - {dataset_name} (Portfolio-Based)")
+        print("="*70)
+        print(f"💼 Portfolio Performance:")
+        print(f"   Initial Value: ${initial_cash:,.2f}")
+        print(f"   Final Value: ${portfolio_values[-1]:,.2f}")
+        print(f"   Absolute P&L: ${portfolio_values[-1] - initial_cash:,.2f}")
+        
+        print(f"\n📈 Return Metrics:")
         print(f"   Total Return: {metrics['total_return']:.2%}")
         print(f"   Annualized Return: {metrics['annualized_return']:.2%}")
         print(f"   Volatility: {metrics['volatility']:.2%}")
@@ -868,6 +904,7 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         'episode_rewards': all_episode_rewards,
         'step_rewards': all_step_rewards, 
         'cumulative_rewards': all_cumulative_rewards,
+        'portfolio_values': all_portfolio_values,  # 추가: 실제 포트폴리오 가치
         'avg_reward': avg_reward,
         'std_reward': std_reward,
         'financial_metrics': metrics
