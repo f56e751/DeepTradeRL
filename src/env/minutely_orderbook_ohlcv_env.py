@@ -3,6 +3,12 @@ from gym import spaces
 import numpy as np
 import pandas as pd
 
+import sys
+import os
+
+# Add the src directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from src.env.inventory import Inventory
 from src.env.transaction_info import TransactionInfo
 from src.data_handler.csv_processor import merge_lob_and_ohlcv
@@ -45,28 +51,39 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
         self.hold_threshold = hold_threshold
 
         # handler 생성 및 include 옵션 자동 결정
-          # lstm 출력용이면 lookback을 1로 함 (데이터 중복 방지)
-        if input_type == InputType.LSTM:
-            lookback = 1
-        self.handler = handler_cls(df=self.df, lob_levels=lob_levels, lookback=lookback)
-        include_pnl = isinstance(self.handler, (Sc202OHLCVHandler, Sc203OHLCVHandler))
-        include_spread = isinstance(self.handler, Sc203OHLCVHandler)
+        #   # lstm 출력용이면 lookback을 1로 함 (데이터 중복 방지)
+        # if input_type == InputType.LSTM:
+        #     lookback = 1
+        self.handler_temp = handler_cls(df=self.df, lob_levels=lob_levels, lookback=lookback)
+        self.handler_mlp = handler_cls(df=self.df, lob_levels=lob_levels, lookback=lookback)
+        self.handler_lstm = handler_cls(df=self.df, lob_levels=lob_levels, lookback=1)
+        include_pnl = isinstance(self.handler_temp, (Sc202OHLCVHandler, Sc203OHLCVHandler))
+        include_spread = isinstance(self.handler_temp, Sc203OHLCVHandler)
 
-        include_tech = isinstance(self.handler, Sc203OHLCVTechHandler)
+        include_tech = isinstance(self.handler_temp, Sc203OHLCVTechHandler)
         include_ohlcv = True
 
         # Observation 생성
-
-
-        self.observation = Observation(
+        self.observation_mlp = Observation(
             lob_levels=lob_levels,
             lookback=lookback,
             include_pnl=include_pnl,
             include_spread=include_spread,
             include_ohlcv=include_ohlcv,
             include_tech=include_tech,
+            window_size=1
+        )
+
+        self.observation_lstm = Observation(
+            lob_levels=lob_levels,
+            lookback=1,
+            include_pnl=include_pnl,
+            include_spread=include_spread,
+            include_ohlcv=include_ohlcv,
+            include_tech=include_tech,
             window_size=window_size
         )
+
         self.input_type = input_type
 
         # Inventory 및 스텝
@@ -83,17 +100,16 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
         # --- observation_space 설정: Dict 또는 Box ---
         # self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=sample.shape, dtype=np.float32)
         if self.input_type == InputType.LSTM:
-            snaps_dim = self.observation.dim_snapshots + self.observation.dim_current
-            rest_dim = self.observation.dim_total - snaps_dim
+            snaps_dim = self.observation_lstm.dim_snapshots + self.observation_lstm.dim_current
             self.observation_space = spaces.Dict({
-                'snapshots': spaces.Box(
+                'lstm_snapshots': spaces.Box(
                     low=-np.inf, high=np.inf,
-                    shape=(self.observation.window_size, snaps_dim),
+                    shape=(self.observation_lstm.window_size, snaps_dim),
                     dtype=np.float32
                 ),
-                'others': spaces.Box(
+                'mlp_input': spaces.Box(
                     low=-np.inf, high=np.inf,
-                    shape=(self.observation.window_size, rest_dim),
+                    shape=(self.observation_mlp.dim_total,),
                     dtype=np.float32
                 )
             })
@@ -101,15 +117,20 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
             # MLP 입력은 기존 단일 벡터
             self.observation_space = spaces.Box(
                 low=-np.inf, high=np.inf,
-                shape=(self.observation.dim_total,),
+                shape=(self.observation_mlp.dim_total,),
                 dtype=np.float32
             )
 
     def _init_observation(self):
-        self.observation.reset()
+        self.observation_mlp.reset()
+        self.observation_lstm.reset()
+
         pos, pnl = 0, 0.0
-        feats = self.handler.get_observation(step=0, position=pos, pnl=pnl)
-        self.observation.append(feats)
+
+        feats_mlp = self.handler_mlp.get_observation(step=0, position=pos, pnl=pnl)
+        feats_lstm = self.handler_lstm.get_observation(step=0, position=pos, pnl=pnl)
+        self.observation_mlp.append(feats_mlp)
+        self.observation_lstm.append(feats_lstm)
         return self._get_obs()
 
     def reset(self):
@@ -121,13 +142,22 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
         self.current_step = 0
         self.inventory.reset()
         # Observation history 초기화
-        self.observation.reset()
+        self.observation_mlp.reset()
+        self.observation_lstm.reset()
         # 초기 피처 생성 (현 스텝 = 0)
         pos, pnl = 0, 0.0
-        init_feats = self.handler.get_observation(step=0, position=pos, pnl=pnl)
-        # window_size-1 만큼 hold (동일 피처)로 채우기
-        for _ in range(self.observation.window_size - 1):
-            self.observation.append(init_feats)
+        # init_feats = self.handler.get_observation(step=0, position=pos, pnl=pnl)
+        # # window_size-1 만큼 hold (동일 피처)로 채우기
+        # for _ in range(self.observation.window_size - 1):
+        #     self.observation.append(init_feats)
+
+        init_feats_mlp = self.handler_mlp.get_observation(step=0, position=pos, pnl=pnl)
+        init_feats_lstm = self.handler_lstm.get_observation(step=0, position=pos, pnl=pnl)
+        self.observation_mlp.fill_window_size(init_feats_mlp)
+        self.observation_lstm.fill_window_size(init_feats_lstm)
+
+
+        
         # 마지막으로 현재 스텝 obs 추가 및 반환
         return self._get_obs()
 
@@ -144,14 +174,28 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
         pos = np.sign(self.inventory.get_position('TICKER'))
         mid = self._get_mid_price()
         pnl = self.inventory.get_unrealized_pnl({'TICKER': mid})
-        feats = self.handler.get_observation(
+
+        feats_mlp = self.handler_mlp.get_observation(
             step=self.current_step, position=int(pos), pnl=float(pnl)
         )
-        self.observation.append(feats)
+        self.observation_mlp.append(feats_mlp)
+
+        feats_lstm = self.handler_lstm.get_observation(
+            step=self.current_step, position=int(pos), pnl=float(pnl)
+        )
+        self.observation_lstm.append(feats_lstm)
+
         if self.input_type == InputType.MLP:
-            return self.observation.get_mlp_input()
+            # return self.observation.get_mlp_input()
+            return self.observation_mlp.get_mlp_input()
         # LSTM인 경우 dict 형태로 반환
-        return self.observation.get_lstm_input()
+        lstm_dict = self.observation_lstm.get_lstm_input()
+        lstm_snapshots = lstm_dict['snapshots']
+
+        mlp_input = self.observation_mlp.get_mlp_input()
+        lstm_input_dict = {'lstm_snapshots': lstm_snapshots,
+                           'mlp_input': mlp_input}
+        return lstm_input_dict
 
     def step(self, action):
         """연속 액션 실행 및 보상 계산"""

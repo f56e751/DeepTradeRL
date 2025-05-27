@@ -21,7 +21,7 @@ def test_merge_and_env(
         initial_cash = 10000000000.0,
         lob_levels = 10,
         lookback = 9,
-        window_size = 9,
+        window_size = 100,
         input_type = InputType.LSTM,
         transaction_fee = 0.0023,
         h_max = 100,
@@ -34,8 +34,8 @@ def test_merge_and_env(
     # snapshots가  (ask price, volume) -> 20쌍
     # 순서는?
     if isinstance(obs, dict):
-        snaps, others = obs['snapshots'], obs['others']
-        print(f"Initial snapshots shape: {snaps.shape}, others shape: {others.shape}")
+        snaps, others = obs['lstm_snapshots'], obs['mlp_input']
+        print(f"Initial lstm_snapshots shape: {snaps.shape}, mlp_input shape: {others.shape}")
     else:
         print(f"Initial obs shape: {obs.shape}")
 
@@ -77,8 +77,8 @@ def test_merge_and_env_tech(
     # snapshots가  (ask price, volume) -> 20쌍
     # 순서는?
     if isinstance(obs, dict):
-        snaps, others = obs['snapshots'], obs['others']
-        print(f"Initial snapshots shape: {snaps.shape}, others shape: {others.shape}")
+        snaps, others = obs['lstm_snapshots'], obs['mlp_input']
+        print(f"Initial lstm_snapshots shape: {snaps.shape}, mlp_input shape: {others.shape}")
     else:
         print(f"Initial obs shape: {obs.shape}")
 
@@ -98,15 +98,15 @@ if __name__ == "__main__":
     ohlcv_extended_csv_path = "src/db/indicator/AAPL_with_indicators_v2.csv"
 
     # Sc201, Sc202, Sc203 핸들러 중 하나 선택
-    # test_merge_and_env(
-    #     lob_csv_path,
-    #     ohlcv_csv_path
-    # )
-
-    test_merge_and_env_tech(
+    test_merge_and_env(
         lob_csv_path,
-        ohlcv_extended_csv_path 
+        ohlcv_csv_path
     )
+
+    # test_merge_and_env_tech(
+    #     lob_csv_path,
+    #     ohlcv_extended_csv_path 
+    # )
 
 
 

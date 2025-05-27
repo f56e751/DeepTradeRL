@@ -77,6 +77,10 @@ class Observation:
         """히스토리(과거 관측)를 비웁니다."""
         self.history.clear()
 
+    def fill_window_size(self, init_feats):
+        for _ in range(self.window_size - 1):
+            self.append(init_feats)
+
     def append(self, features: list):
         """
         Flatten된 features 리스트를 받아
