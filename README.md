@@ -7,4 +7,8 @@ AAPL 1분봉 OHLCV 데이터 + Orderbook 데이터를 이용하여 강화학습 
 
 
 # Example
-$ python ppo_agent_tech.py --include_tech = True
+$ python ppo_agent_tech.py --include_tech True --input_type LSTM
+
+# Result
+![image](https://github.com/user-attachments/assets/89a0b507-e069-41ad-8af3-28e2183da3a1)
+
