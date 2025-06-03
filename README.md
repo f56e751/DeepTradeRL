@@ -2,7 +2,7 @@
 The model takes 1-minute OHLCV and Orderbook data as input and learns temporal patterns through a deep learning network combining CNN and LSTM architectures. The reinforcement learning agent makes buy/sell/hold decisions based on processed features, continuously optimizing trading strategies through rewards received from the market environment.
 
 # Core Data Sources:
-1-Minute OHLCV Data: Utilizes Open, High, Low, Close, and Volume data at 1-minute intervals for comprehensive price action analysis
+1-Minute OHLCV Data: Utilizes Open, High, Low, Close, and Volume data at 1-minute intervals for comprehensive price action analysis \\
 1-Minute Orderbook Data: Incorporates real-time orderbook depth information to capture market microstructure and liquidity dynamics
 
 # Model Architecture
