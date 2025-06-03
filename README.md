@@ -1,9 +1,18 @@
 # YAI-CON_RL-HFT
 The model takes 1-minute OHLCV and Orderbook data as input and learns temporal patterns through a deep learning network combining CNN and LSTM architectures. The reinforcement learning agent makes buy/sell/hold decisions based on processed features, continuously optimizing trading strategies through rewards received from the market environment.
 
-# Core Data Sources:
-1-Minute OHLCV Data: Utilizes Open, High, Low, Close, and Volume data at 1-minute intervals for comprehensive price action analysis \\
-1-Minute Orderbook Data: Incorporates real-time orderbook depth information to capture market microstructure and liquidity dynamics
+## Core Data Sources
+**1-Minute OHLCV Data**: Utilizes Open, High, Low, Close, and Volume data at 1-minute intervals for comprehensive price action analysis
+
+**1-Minute Orderbook Data**: Incorporates real-time orderbook depth information to capture market microstructure and liquidity dynamics
+
+## Environment Setup
+Please use the provided environment.yml file to set up the required dependencies:
+
+```bash
+conda env create -f environment.yml
+conda activate rl-hft
+```
 
 # Model Architecture
 ![image](https://github.com/user-attachments/assets/6383815f-4210-477f-b5de-da2944416933)
