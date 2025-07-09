@@ -19,7 +19,8 @@ conda activate rl-hft
 
 
 # Example
-python ppo_agent_tech.py --include_tech True --input_type LSTM
+src/agent/python ppo_agent_tech.py --include_tech True --input_type LSTM
+src/agent/python sac_agent_tech.py --include_tech True --input_type LSTM
 
 # Result
 ![image](https://github.com/user-attachments/assets/89a0b507-e069-41ad-8af3-28e2183da3a1)

@@ -6,7 +6,7 @@ import numpy as np
 import psutil
 import torch
 import yaml
-from stable_baselines3 import PPO
+from stable_baselines3 import SAC
 from stable_baselines3.common.logger import configure
 import sys
 import os
@@ -83,11 +83,24 @@ def train_agent(env, save_directory, device, args):
         yaml.dump(args._get_kwargs(), file)
 
     # Initialize model with custom logger
-    model = PPO('MlpPolicy', verbose=0, env=env,
-                gamma=args.gamma, ent_coef=args.ent_coef, max_grad_norm=args.grad_clip,
+    model = SAC('MlpPolicy', verbose=0, env=env,
+                gamma=args.gamma, 
+                tau=args.tau,
+                ent_coef=args.ent_coef,
+                target_update_interval=args.target_update_interval,
+                target_entropy=args.target_entropy,
+                use_sde=args.use_sde,
+                sde_sample_freq=args.sde_sample_freq,
+                use_sde_at_warmup=args.use_sde_at_warmup,
                 learning_rate=args.lr,
-                device=device, batch_size=128, seed=args.seed,
-                policy_kwargs=dict(net_arch=dict(pi=[64, 64], vf=[64, 64])),
+                buffer_size=args.buffer_size,
+                learning_starts=args.learning_starts,
+                batch_size=args.batch_size,
+                train_freq=args.train_freq,
+                gradient_steps=args.gradient_steps,
+                device=device, 
+                seed=args.seed,
+                policy_kwargs=dict(net_arch=dict(pi=[64, 64], qf=[64, 64])),
                 tensorboard_log=os.path.join('runs/' + save_directory, 'tensorboard'))
 
     # Set up logging with more detailed configuration
@@ -105,6 +118,11 @@ def train_agent(env, save_directory, device, args):
     print(f"Total timesteps: {args.iters}")
     print(f"Device: {device}")
     print(f"Model saved to: runs/{save_directory}")
+    print(f"Buffer size: {args.buffer_size}")
+    print(f"Learning starts: {args.learning_starts}")
+    print(f"Batch size: {args.batch_size}")
+    print(f"Train frequency: {args.train_freq}")
+    print(f"Target entropy: {args.target_entropy}")
     print("\nTraining Status:")
     
     # Train with progress tracking
@@ -114,7 +132,7 @@ def train_agent(env, save_directory, device, args):
     print(f"Total training time: {(time.time() - status_callback.training_start)/60:.1f} minutes")
     
     env.close()
-    model.save(os.path.join(os.path.join('runs/' + save_directory), 'ppo_agent'))
+    model.save(os.path.join(os.path.join('runs/' + save_directory), 'sac_agent'))
 
 
 if __name__ == '__main__':
@@ -144,12 +162,36 @@ if __name__ == '__main__':
     parser.add_argument("--no_gpu", "-ngpu", action="store_true")
     parser.add_argument("--which_gpu", "-gpu_id", default=0)
     
-    # Training related arguments
+    # SAC specific training arguments
     parser.add_argument("--iters", "-i", type=int, default=10000)
-    parser.add_argument("--lr", type=float, default=.00032)
-    parser.add_argument("--grad_clip", type=float, default=.5)
-    parser.add_argument("--gamma", type=float, default=.99)
-    parser.add_argument("--ent_coef", type=float, default=.0089)
+    parser.add_argument("--lr", type=float, default=0.0003,
+                        help='Learning rate')
+    parser.add_argument("--gamma", type=float, default=0.99,
+                        help='Discount factor')
+    parser.add_argument("--tau", type=float, default=0.005,
+                        help='Soft update coefficient for target networks')
+    parser.add_argument("--ent_coef", type=str, default='auto',
+                        help='Entropy coefficient (auto or float)')
+    parser.add_argument("--target_update_interval", type=int, default=1,
+                        help='Target network update interval')
+    parser.add_argument("--target_entropy", type=str, default='auto',
+                        help='Target entropy (auto or float)')
+    parser.add_argument("--use_sde", action="store_true", default=False,
+                        help='Use State Dependent Exploration')
+    parser.add_argument("--sde_sample_freq", type=int, default=-1,
+                        help='Sample frequency for SDE')
+    parser.add_argument("--use_sde_at_warmup", action="store_true", default=False,
+                        help='Use SDE at warmup')
+    parser.add_argument("--buffer_size", type=int, default=1000000,
+                        help='Replay buffer size')
+    parser.add_argument("--learning_starts", type=int, default=100,
+                        help='Learning starts after this many steps')
+    parser.add_argument("--batch_size", type=int, default=256,
+                        help='Batch size for training')
+    parser.add_argument("--train_freq", type=int, default=1,
+                        help='Training frequency')
+    parser.add_argument("--gradient_steps", type=int, default=1,
+                        help='Gradient steps per update')
 
     # Misc arguments
     parser.add_argument("--seed", type=int, default=42)

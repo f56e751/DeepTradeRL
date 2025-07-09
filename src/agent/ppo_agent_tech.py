@@ -115,7 +115,7 @@ def train_agent(env, save_directory, device, args):
     print(f"Total training time: {(time.time() - status_callback.training_start)/60:.1f} minutes")
     
     env.close()
-    model.save(os.path.join(os.path.join('runs/' + save_directory), 'agent'))
+    model.save(os.path.join(os.path.join('runs/' + save_directory), 'ppo_agent'))
 
 
 if __name__ == '__main__':
