@@ -1039,7 +1039,7 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         print(f"Episode {episode + 1}/{num_episodes} - {dataset_name}")
         
         # 초기 포트폴리오 가치 기록
-        mid_price = env._get_mid_price()
+        mid_price = env.get_price()
         initial_portfolio_value = env.inventory.get_portfolio_value({'TICKER': mid_price})
         episode_portfolio_values.append(initial_portfolio_value)
         
@@ -1063,7 +1063,7 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
             episode_cumulative_rewards.append(episode_reward)
             
             # Record actual portfolio value using mid price
-            mid_price = env._get_mid_price()
+            mid_price = env.get_price()
             portfolio_value = env.inventory.get_portfolio_value({'TICKER': mid_price})
             episode_portfolio_values.append(portfolio_value)
             

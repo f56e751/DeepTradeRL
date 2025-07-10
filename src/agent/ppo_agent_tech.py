@@ -26,6 +26,7 @@ from src.infrastructure.callback import TrainingStatusCallback
 from src.agent.wrapper import LSTMObsWrapper, load_pretrained_lstm
 from src.deeplob.model import deeplob
 
+from src.data_handler.data_handler import ResampledSc201OHLCVHandler, ResampledSc202OHLCVHandler, ResampledSc203OHLCVHandler
 def main(args):
     if args.seed is None:
         args.seed = int(random.random() * 10000)
@@ -52,7 +53,19 @@ def main(args):
     df_train, df_val, df_test = splitter.split(df_all)
     
     # handler_cls 선택
-    handler = Sc203OHLCVTechHandler if args.include_tech else Sc203OHLCVHandler
+    # handler = Sc203OHLCVTechHandler if args.include_tech else Sc203OHLCVHandler
+    if args.resample_rule:
+        if args.include_tech:
+            handler = ResampledSc203OHLCVHandler
+        else:
+            handler = ResampledSc203OHLCVHandler
+    else:
+        if args.include_tech:
+            handler = Sc203OHLCVTechHandler
+        else:
+            handler = Sc203OHLCVHandler
+
+
 
     # 틱 단위 거래 환경 생성
     default_env = MinutelyOrderbookOHLCVEnv(
@@ -136,7 +149,7 @@ if __name__ == '__main__':
                         required=False, help='Max shares to trade')
     parser.add_argument("--lookback", type=int, default=9,
                         required=False, help='Lookback')
-    parser.add_argument("--h_max", type=int, default=1,
+    parser.add_argument("--h_max", type=int, default=250,
                         required=False, help='Max action')
     parser.add_argument("--hold_threshold", type=float, default=0.2,
                         required=False, help='Hold threshold')
@@ -152,16 +165,23 @@ if __name__ == '__main__':
     parser.add_argument("--which_gpu", "-gpu_id", default=0)
     
     # Training related arguments
-    parser.add_argument("--iters", "-i", type=int, default=10000)
-    parser.add_argument("--lr", type=float, default=.00032)
-    parser.add_argument("--grad_clip", type=float, default=.5)
-    parser.add_argument("--gamma", type=float, default=.99)
-    parser.add_argument("--ent_coef", type=float, default=.0089)
+    parser.add_argument("--iters", "-i", type=int, default=1000000)
+    parser.add_argument("--lr", type=float, default=.0001)
+    parser.add_argument("--grad_clip", type=float, default=.7)
+    parser.add_argument("--gamma", type=float, default=.95)
+    parser.add_argument("--ent_coef", type=float, default=.002)
 
     # Misc arguments
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--tag", type=str, default=None, help='Tag to add to the save directory')
-
+    
+    # 10분봉, 15분봉으로 교체
+    parser.add_argument(
+        "--resample_rule",
+        type=str,
+        default=None,
+        help="리샘플링 주기 (예: '10T', '15T')"
+    )
     args = parser.parse_args()
     torch.use_deterministic_algorithms(True)
 

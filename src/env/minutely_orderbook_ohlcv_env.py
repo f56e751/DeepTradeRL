@@ -167,12 +167,12 @@ class MinutelyOrderbookOHLCVEnv(gym.Env):
     def _get_best_ask(self):
         return float(self.df.loc[self.current_step, 'ask_px_00'])
 
-    def _get_mid_price(self):
+    def get_price(self):
         return (self._get_best_bid() + self._get_best_ask()) / 2
 
     def _get_obs(self):
         pos = np.sign(self.inventory.get_position('TICKER'))
-        mid = self._get_mid_price()
+        mid = self.get_price()
         pnl = self.inventory.get_unrealized_pnl({'TICKER': mid})
 
         feats_mlp = self.handler_mlp.get_observation(

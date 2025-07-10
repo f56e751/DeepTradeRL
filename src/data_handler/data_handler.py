@@ -475,7 +475,125 @@ class Sc203OHLCVTechHandler(Sc203OHLCVHandler):
         return features
 
 
+## 10, 15분단위 orderbook + ohlcv handler
+def _aggregate_df(df: pd.DataFrame, rule: str) -> pd.DataFrame:
+    """
+    주어진 1분 단위 df를 resample rule(예: '10min','15min')에 맞춰 집계.
+    - OHLCV: open first, high max, low min, close last, volume sum
+    - LOB price: 각 가격 컬럼의 마지막 값
+    """
+    # 'T' 대신 'min' 사용
+    rule = rule.replace('T', 'min')
 
+    df2 = df.copy()
+    if 'timestamp' in df2.columns:
+        df2.index = pd.to_datetime(df2['timestamp'])
+
+    # OHLCV 집계
+    ohlcv = df2[['open','high','low','close','volume']] \
+        .resample(rule) \
+        .agg({
+            'open': 'first',
+            'high': 'max',
+            'low':  'min',
+            'close':'last',
+            'volume':'sum'
+        })
+
+    # 문자열인 LOB price 컬럼만 골라 마지막 값 사용
+    lob_price_cols = [
+        c for c in df2.columns
+        if isinstance(c, str) and (c.startswith('bid_px_') or c.startswith('ask_px_'))
+    ]
+    lob = df2[lob_price_cols].resample(rule).last()
+
+    df_agg = pd.concat([ohlcv, lob], axis=1).dropna().reset_index(drop=True)
+    return df_agg
+
+
+
+class ResampledSc201OHLCVHandler(Sc201OHLCVHandler):
+    """
+    Sc201OHLCVHandler를 상속하여, 데이터프레임을 10분/15분 단위로 리샘플링 후 처리
+    """
+    def __init__(self, df: pd.DataFrame, lob_levels=10, lookback=9, resample_rule='10T'):
+        df_agg = _aggregate_df(df, resample_rule)
+        super().__init__(df_agg, lob_levels, lookback)
+
+
+class ResampledSc202OHLCVHandler(Sc202OHLCVHandler):
+    """
+    Sc202OHLCVHandler를 상속하여 PnL 포함, 리샘플링 지원
+    """
+    def __init__(self, df: pd.DataFrame, lob_levels=10, lookback=9, resample_rule='10T'):
+        df_agg = _aggregate_df(df, resample_rule)
+        super().__init__(df_agg, lob_levels, lookback)
+
+
+class ResampledSc203OHLCVHandler(Sc203OHLCVHandler):
+    """
+    Sc203OHLCVHandler를 상속하여 스프레드 포함, 리샘플링 지원
+    """
+    def __init__(self, df: pd.DataFrame, lob_levels=10, lookback=9, resample_rule='10T'):
+        df_agg = _aggregate_df(df, resample_rule)
+        super().__init__(df_agg, lob_levels, lookback)
+
+
+
+## ohlcv만 다루는 handler
+class OHLCVPositionHandler(TickDataHandlerBase):
+    """
+    OHLCV + position 핸들러
+    - 각 step에서 [open, high, low, close, volume, position] 반환
+    """
+    def __init__(self, df: pd.DataFrame):
+        super().__init__(df)
+        required = {'open', 'high', 'low', 'close', 'volume'}
+        missing = required - set(self.df.columns)
+        if missing:
+            raise ValueError(f"DataFrame에 다음 컬럼이 필요합니다: {missing}")
+
+    def get_additional_features(self, step: int, position: int, **kwargs) -> list:
+        row = self.df.iloc[step]
+        return [
+            row['open'],
+            row['high'],
+            row['low'],
+            row['close'],
+            row['volume'],
+            position
+        ]
+
+
+class OHLCVPositionPnlHandler(TickDataHandlerBase):
+    """
+    OHLCV + position + 미실현 P&L 핸들러
+    - 각 step에서 [open, high, low, close, volume, position, pnl] 반환
+    """
+    def __init__(self, df: pd.DataFrame):
+        super().__init__(df)
+        required = {'open', 'high', 'low', 'close', 'volume'}
+        missing = required - set(self.df.columns)
+        if missing:
+            raise ValueError(f"DataFrame에 다음 컬럼이 필요합니다: {missing}")
+
+    def get_additional_features(
+        self,
+        step: int,
+        position: int,
+        pnl: float = 0.0,
+        **kwargs
+    ) -> list:
+        row = self.df.iloc[step]
+        return [
+            row['open'],
+            row['high'],
+            row['low'],
+            row['close'],
+            row['volume'],
+            position,
+            pnl
+        ]
 
 
 
