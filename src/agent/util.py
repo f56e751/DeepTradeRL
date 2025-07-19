@@ -837,7 +837,7 @@ def plot_training_reward_curves(training_metrics, save_directory, args=None):
     print(f"  - Ensuring sufficient training steps per episode")
 
 
-def plot_reward_curves(step_rewards, cumulative_rewards, num_episodes, dataset_name):
+def plot_reward_curves(step_rewards, cumulative_rewards, num_episodes, dataset_name, save_directory=None):
     """
     Plot reward curves for visualization (original function, unchanged)
     """
@@ -878,7 +878,10 @@ def plot_reward_curves(step_rewards, cumulative_rewards, num_episodes, dataset_n
             axes[0].legend()
     
     plt.tight_layout()
-    filename = f'reward_curves_{dataset_name.lower()}.png'
+    if save_directory:
+        filename = f'runs/{save_directory}/reward_curves_{dataset_name.lower()}.png'
+    else:
+        filename = f'reward_curves_{dataset_name.lower()}.png'
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.show()
     
@@ -985,7 +988,7 @@ def compare_performance(val_results, test_results, save_directory):
     axes[1, 1].set_title('Performance Metrics Comparison', fontweight='bold', pad=20)
     
     plt.tight_layout()
-    comparison_filename = f'performance_comparison.png'
+    comparison_filename = f'runs/{save_directory}/performance_comparison.png'
     plt.savefig(comparison_filename, dpi=300, bbox_inches='tight')
     plt.show()
     
@@ -1009,7 +1012,7 @@ def compare_performance(val_results, test_results, save_directory):
         print("✅ No obvious overfitting (test >= validation performance)")
 
 
-def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100000):
+def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100000, save_directory=None):
     """
     Enhanced evaluation with comprehensive financial metrics and action analysis
     """
@@ -1098,7 +1101,10 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
     action_stats = calculate_action_statistics(all_actions, hold_threshold, h_max)
     
     # Create action analysis visualization
-    action_save_path = f'action_analysis_{dataset_name.lower()}.png'
+    if save_directory:
+        action_save_path = f'runs/{save_directory}/action_analysis_{dataset_name.lower()}.png'
+    else:
+        action_save_path = f'action_analysis_{dataset_name.lower()}.png'
     plot_action_analysis(action_stats, dataset_name, action_save_path)
     
     # Calculate comprehensive financial metrics using actual portfolio values
@@ -1114,7 +1120,10 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
     
     if metrics:
         # Create comprehensive visualization with action stats
-        save_path = f'comprehensive_analysis_{dataset_name.lower()}.png'
+        if save_directory:
+            save_path = f'runs/{save_directory}/comprehensive_analysis_{dataset_name.lower()}.png'
+        else:
+            save_path = f'comprehensive_analysis_{dataset_name.lower()}.png'
         plot_comprehensive_financial_analysis(metrics, dataset_name, action_stats, save_path)
         
         # Print detailed metrics
@@ -1170,7 +1179,7 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
             print("   ⚠️  Low win rate - strategy may rely on few large wins")
     
     # Also create the original visualization
-    plot_reward_curves(all_step_rewards, all_cumulative_rewards, num_episodes, dataset_name)
+    plot_reward_curves(all_step_rewards, all_cumulative_rewards, num_episodes, dataset_name, save_directory)
     
     # Print evaluation summary
     avg_reward = np.mean(all_episode_rewards)

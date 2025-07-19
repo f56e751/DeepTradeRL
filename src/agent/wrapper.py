@@ -42,6 +42,7 @@ class LSTMObsWrapper(gym.Wrapper):
             shape=(total_dim,), dtype=np.float32
         )
         self.action_space = env.action_space
+        self.temp_env = env
 
     def reset(self, **kwargs):
         raw_obs = self.env.reset(**kwargs)
@@ -95,6 +96,9 @@ class LSTMObsWrapper(gym.Wrapper):
 
         # --- 4) concat & 반환 ---
         return np.concatenate([feats_lstm, vec_mlp], axis=0)
+    
+    def _get_mid_price(self):
+        return self.temp_env._get_mid_price()
 
 
 def load_pretrained_lstm():
