@@ -4,14 +4,10 @@ import numpy as np
 import sys
 import os
 
-# Add the src directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from ..data_handler import merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter, Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
+from ..env import MinutelyOrderbookOHLCVEnv, InputType
+from ..deeplob import deeplob
 
-from src.data_handler.csv_processor import merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter
-from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
-from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
-from src.env.observation import InputType
-from src.deeplob.model import deeplob
 
 
 class LSTMObsWrapper(gym.Wrapper):

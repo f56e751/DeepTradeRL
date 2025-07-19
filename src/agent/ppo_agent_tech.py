@@ -13,20 +13,25 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
-# Add the src directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from ..infrastructure import init_gpu, TrainingStatusCallback
+from ..env import MinutelyOrderbookOHLCVEnv, InputType
+from ..data_handler import Sc203Handler, Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler, merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter, ResampledSc201OHLCVHandler, ResampledSc202OHLCVHandler, ResampledSc203OHLCVHandler
+from .wrapper import LSTMObsWrapper, load_pretrained_lstm
 
-from src.infrastructure.pytorch_util import init_gpu
-from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
-from src.data_handler.data_handler import Sc203Handler
-from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
-from src.env.observation import Observation, InputType
-from src.data_handler.csv_processor import merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter
-from src.infrastructure.callback import TrainingStatusCallback
-from src.agent.wrapper import LSTMObsWrapper, load_pretrained_lstm
-from src.deeplob.model import deeplob
+# # Add the src directory to the Python path
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from src.data_handler.data_handler import ResampledSc201OHLCVHandler, ResampledSc202OHLCVHandler, ResampledSc203OHLCVHandler
+# from src.infrastructure.pytorch_util import init_gpu
+# from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
+# from src.data_handler.data_handler import Sc203Handler
+# from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler, ResampledSc201OHLCVHandler, ResampledSc202OHLCVHandler, ResampledSc203OHLCVHandler
+# from src.env.observation import Observation, InputType
+# from src.data_handler.csv_processor import merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter
+# from src.infrastructure.callback import TrainingStatusCallback
+# from src.agent.wrapper import LSTMObsWrapper, load_pretrained_lstm
+# from src.deeplob.model import deeplob
+
+# from src.data_handler.data_handler import ResampledSc201OHLCVHandler, ResampledSc202OHLCVHandler, ResampledSc203OHLCVHandler
 def main(args):
     if args.seed is None:
         args.seed = int(random.random() * 10000)

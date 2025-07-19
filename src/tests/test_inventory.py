@@ -1,5 +1,7 @@
-from src.env.inventory import Inventory
-from src.env.transaction_info import TransactionInfo, TradeType
+from ..env import Inventory, TransactionInfo, TradeType
+
+# from src.env.inventory import Inventory
+# from src.env.transaction_info import TransactionInfo, TradeType
 
 def test_inventory_pnl_with_transaction_info():
     # 1) 인벤토리 초기화

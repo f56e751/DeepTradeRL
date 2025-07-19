@@ -7,15 +7,19 @@ import numpy as np
 import torch
 from stable_baselines3 import PPO
 
-# 프로젝트의 src 폴더를 경로에 추가
-# sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from ..data_handler import load_ohlcv_df, DataSplitter, DFProcessMode, OHLCVPositionHandler, OHLCVPositionPnlHandler
+from ..env import MinutelyOHLCVEnv
+from ..agent import evaluate_model
 
-# 필요한 모듈 임포트
-from src.data_handler.csv_processor import load_ohlcv_df, DataSplitter, DFProcessMode
-from src.data_handler.data_handler import OHLCVPositionHandler, OHLCVPositionPnlHandler
-from src.env.minutely_ohlcv_env import MinutelyOHLCVEnv
-from src.agent.util import evaluate_model  # evaluate_model 정의된 모듈 경로로 변경
+# # 프로젝트의 src 폴더를 경로에 추가
+# # sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# # 필요한 모듈 임포트
+# from src.data_handler.csv_processor import load_ohlcv_df, DataSplitter, DFProcessMode
+# from src.data_handler.data_handler import OHLCVPositionHandler, OHLCVPositionPnlHandler
+# from src.env.minutely_ohlcv_env import MinutelyOHLCVEnv
+# from src.agent.util import evaluate_model  # evaluate_model 정의된 모듈 경로로 변경
 
 def main():
     parser = argparse.ArgumentParser(description="Load trained PPO model and evaluate")

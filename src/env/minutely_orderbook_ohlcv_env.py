@@ -6,14 +6,20 @@ import pandas as pd
 import sys
 import os
 
-# Add the src directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from .inventory import Inventory
+from .transaction_info import TransactionInfo
+from ..data_handler import merge_lob_and_ohlcv
+from ..data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
+from .observation import Observation, InputType
 
-from src.env.inventory import Inventory
-from src.env.transaction_info import TransactionInfo
-from src.data_handler.csv_processor import merge_lob_and_ohlcv
-from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
-from src.env.observation import Observation, InputType
+# # Add the src directory to the Python path
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# from src.env.inventory import Inventory
+# from src.env.transaction_info import TransactionInfo
+# from src.data_handler.csv_processor import merge_lob_and_ohlcv
+# from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
+# from src.env.observation import Observation, InputType
 
 class MinutelyOrderbookOHLCVEnv(gym.Env):
     """

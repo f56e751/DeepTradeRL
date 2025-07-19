@@ -1,5 +1,6 @@
 from typing import Dict
-from src.env.transaction_info import TransactionInfo,TradeType
+from .transaction_info import TransactionInfo, TradeType
+
 
 class Inventory:
     """

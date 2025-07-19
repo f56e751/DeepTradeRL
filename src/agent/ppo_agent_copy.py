@@ -13,19 +13,24 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
-# Add the src directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from ..infrastructure import init_gpu, TrainingStatusCallback
+from ..env import MinutelyOrderbookOHLCVEnv, observation
+from ..data_handler import Sc203Handler, Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, merge_lob_and_ohlcv, DataSplitter
 
-from src.infrastructure.pytorch_util import init_gpu
-from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
-from src.data_handler.data_handler import Sc203Handler
-from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler
-from src.env.observation import Observation, InputType
-from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
-from src.infrastructure.callback import TrainingStatusCallback
+
+# # Add the src directory to the Python path
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# from src.infrastructure.pytorch_util import init_gpu
+# from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
+# from src.data_handler.data_handler import Sc203Handler
+# from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler
+# from src.env.observation import Observation, InputType
+# from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
+# from src.infrastructure.callback import TrainingStatusCallback
 
 # Import visualization and utility functions
-from src.agent.util import (
+from .util import (
     TrainingMetricsCallback,
     calculate_financial_metrics,
     plot_comprehensive_financial_analysis,

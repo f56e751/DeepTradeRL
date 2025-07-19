@@ -2,9 +2,14 @@ import gym
 from gym import spaces
 import numpy as np
 import pandas as pd
-from src.env.inventory import Inventory
-from src.data_handler.data_handler import Sc201Handler, Sc202Handler, Sc203Handler, TickDataHandlerBase
-from src.env.transaction_info import TransactionInfo
+
+from .inventory import Inventory
+from ..data_handler import Sc201Handler, Sc202Handler, Sc203Handler
+from .transaction_info import TransactionInfo
+
+# from src.env.inventory import Inventory
+# from src.data_handler.data_handler import Sc201Handler, Sc202Handler, Sc203Handler, TickDataHandlerBase
+# from src.env.transaction_info import TransactionInfo
 
 # Inventory, TickDataHandlerBase, Sc201Handler, Sc202Handler, Sc203Handler 클래스가 같은 스코프에 있어야 합니다.
 class TickStockTradingEnv(gym.Env):

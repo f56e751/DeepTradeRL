@@ -10,15 +10,20 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.logger import configure
 
 import sys
-# Add project root to path so we can import src modules
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from src.infrastructure.pytorch_util import init_gpu
-from src.infrastructure.callback import TrainingStatusCallback
-from src.data_handler.csv_processor import load_ohlcv_df, DataSplitter, DFProcessMode
-from src.data_handler.data_handler import OHLCVPositionHandler, OHLCVPositionPnlHandler
-from src.env.minutely_ohlcv_env import MinutelyOHLCVEnv
+from ..infrastructure import init_gpu, TrainingStatusCallback
+from ..data_handler import load_ohlcv_df, DataSplitter, DFProcessMode, OHLCVPositionHandler, OHLCVPositionPnlHandler
+from ..env import MinutelyOHLCVEnv
+
+# # Add project root to path so we can import src modules
+# # sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# from src.infrastructure.pytorch_util import init_gpu
+# from src.infrastructure.callback import TrainingStatusCallback
+# from src.data_handler.csv_processor import load_ohlcv_df, DataSplitter, DFProcessMode
+# from src.data_handler.data_handler import OHLCVPositionHandler, OHLCVPositionPnlHandler
+# from src.env.minutely_ohlcv_env import MinutelyOHLCVEnv
 
 
 def main(args):

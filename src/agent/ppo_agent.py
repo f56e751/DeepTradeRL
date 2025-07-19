@@ -13,17 +13,23 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
-# Add the src directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from ..infrastructure import init_gpu, TrainingStatusCallback
+from ..env import MinutelyOrderbookOHLCVEnv, InputType
+from ..data_handler import Sc203Handler, Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, merge_lob_and_ohlcv, DataSplitter
+from .wrapper import LSTMObsWrapper
 
-from src.infrastructure.pytorch_util import init_gpu
-from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
-from src.data_handler.data_handler import Sc203Handler
-from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler
-from src.env.observation import Observation, InputType
-from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
-from src.infrastructure.callback import TrainingStatusCallback
-from src.agent.wrapper import LSTMObsWrapper
+
+# # Add the src directory to the Python path
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# from src.infrastructure.pytorch_util import init_gpu
+# from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
+# from src.data_handler.data_handler import Sc203Handler
+# from src.data_handler.data_handler import Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler
+# from src.env.observation import Observation, InputType
+# from src.data_handler.csv_processor import merge_lob_and_ohlcv, DataSplitter
+# from src.infrastructure.callback import TrainingStatusCallback
+# from src.agent.wrapper import LSTMObsWrapper
 
 def main(args):
     if args.seed is None:
