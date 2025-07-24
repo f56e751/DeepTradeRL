@@ -2,8 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-<<<<<<< HEAD
-=======
 *.so
 .Python
 build/
@@ -21,7 +19,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
->>>>>>> origin/main
 **/__pycache__/
 **/*.pyc
 

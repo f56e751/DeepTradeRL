@@ -367,6 +367,19 @@ def merge_lob_and_ohlcv_extended(lob_csv_path, ohlcv_extended_csv_path):
     
     return df_all
 
+def load_ohlcv_df(
+    csv_path: str,
+    process_mode: DFProcessMode = DFProcessMode.FillWithLast
+) -> pd.DataFrame:
+    """
+    주어진 CSV 경로에서 OHLCV 데이터를 로드하여 전처리된 DataFrame으로 반환합니다.
+    - timestamp, open, high, low, close, volume 컬럼만 포함
+    - process_mode에 따라 결측치 처리
+    """
+    processor = OHLCVCSVProcessor()
+    return processor.load_and_process(csv_path, process_mode)
+
+
 def test_DataSplitter():
     # 앞서 merge_lob_and_ohlcv 로 생성한 df_all 사용 가정
     df_all = merge_lob_and_ohlcv(lob_csv_path, ohlcv_csv_path)
