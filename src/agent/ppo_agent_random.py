@@ -17,9 +17,9 @@ import sys
 
 from ..infrastructure import init_gpu, TrainingStatusCallback
 from ..data_handler import merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter, Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
-from ..env import MinutelyOrderbookOHLCVEnv
+from ..trading_env import MinutelyOrderbookOHLCVEnv
 from .wrapper import LSTMObsWrapper, load_pretrained_lstm
-from ..env import InputType
+from ..trading_env import InputType
 
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))

@@ -3,7 +3,7 @@
 import pandas as pd
 
 from ..data_handler import CSVFolderLoader, MultiDataHandler
-from ..env import DailyStockTradingEnv
+from ..trading_env import DailyStockTradingEnv
 
 # from src.data_handler.csv_folder_loader import CSVFolderLoader
 # from src.data_handler.data_handler import MultiDataHandler

@@ -5,7 +5,7 @@ import sys
 import os
 
 from ..data_handler import merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter, Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
-from ..env import MinutelyOrderbookOHLCVEnv, InputType
+from ..trading_env import MinutelyOrderbookOHLCVEnv, InputType
 from ..deeplob import deeplob
 
 

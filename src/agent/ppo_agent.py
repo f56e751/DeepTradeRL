@@ -14,7 +14,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from ..infrastructure import init_gpu, TrainingStatusCallback
-from ..env import MinutelyOrderbookOHLCVEnv, InputType
+from ..trading_env import MinutelyOrderbookOHLCVEnv, InputType
 from ..data_handler import Sc203Handler, Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, merge_lob_and_ohlcv, DataSplitter
 from .wrapper import LSTMObsWrapper
 

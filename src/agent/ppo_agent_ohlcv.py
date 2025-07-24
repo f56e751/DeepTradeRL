@@ -13,7 +13,7 @@ import sys
 
 from ..infrastructure import init_gpu, TrainingStatusCallback
 from ..data_handler import load_ohlcv_df, DataSplitter, DFProcessMode, OHLCVPositionHandler, OHLCVPositionPnlHandler
-from ..env import MinutelyOHLCVEnv
+from ..trading_env import MinutelyOHLCVEnv
 
 # # Add project root to path so we can import src modules
 # # sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

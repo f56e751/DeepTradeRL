@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..data_handler import CSVFolderLoader, merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter, Sc201OHLCVHandler, Sc202OHLCVHandler, Sc203OHLCVHandler, Sc203OHLCVTechHandler
-from ..env import MinutelyOrderbookOHLCVEnv, InputType
+from ..trading_env import MinutelyOrderbookOHLCVEnv, InputType
 
 
 def test_merge_and_env(

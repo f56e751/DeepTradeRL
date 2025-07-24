@@ -1,4 +1,4 @@
-from ..env import Inventory, TransactionInfo, TradeType
+from ..trading_env import Inventory, TransactionInfo, TradeType
 
 # from src.env.inventory import Inventory
 # from src.env.transaction_info import TransactionInfo, TradeType

@@ -1,4 +1,4 @@
-from ..env import TickStockTradingEnv
+from ..trading_env import TickStockTradingEnv
 from ..data_handler import Sc201Handler, Sc202Handler, Sc203Handler, LOBCSVProcessor
 
 import pandas as pd

@@ -15,8 +15,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from src.infrastructure.pytorch_util import init_gpu
 from src.data_handler.csv_processor import merge_lob_and_ohlcv, merge_lob_and_ohlcv_extended, DataSplitter
 from src.data_handler.data_handler import Sc203OHLCVHandler, Sc203OHLCVTechHandler
-from src.env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
-from src.env.observation import InputType
+from src.trading_env.minutely_orderbook_ohlcv_env import MinutelyOrderbookOHLCVEnv
+from src.trading_env.observation import InputType
 from src.agent.wrapper import LSTMObsWrapper, load_pretrained_lstm
 from src.agent.util import evaluate_model  # 평가 함수가 정의된 위치로 변경
 

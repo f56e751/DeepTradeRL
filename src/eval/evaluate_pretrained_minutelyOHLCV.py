@@ -8,7 +8,7 @@ import torch
 from stable_baselines3 import PPO
 
 from ..data_handler import load_ohlcv_df, DataSplitter, DFProcessMode, OHLCVPositionHandler, OHLCVPositionPnlHandler
-from ..env import MinutelyOHLCVEnv
+from ..trading_env import MinutelyOHLCVEnv
 from ..agent import evaluate_model
 
 # # 프로젝트의 src 폴더를 경로에 추가
