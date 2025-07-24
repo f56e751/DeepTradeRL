@@ -2,9 +2,13 @@ import gym
 from gym import spaces
 import numpy as np
 import pandas as pd
-from src.env.inventory import Inventory
-from src.data_handler.data_handler import MultiDataHandler
-from src.env.transaction_info import TransactionInfo
+
+from .inventory import Inventory
+from ..data_handler import MultiDataHandler
+from .transaction_info import TransactionInfo
+# from src.env.inventory import Inventory
+# from src.data_handler.data_handler import MultiDataHandler
+# from src.env.transaction_info import TransactionInfo
 
 class DailyStockTradingEnv(gym.Env):
     """

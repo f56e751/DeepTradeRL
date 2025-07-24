@@ -30,8 +30,8 @@ class Observation:
       LSTM 입력시 사용
 
     - lookback은 "벡터 내부"의 시차 깊이를, window_size는 "시퀀스 길이"를 조절합니다.
-
-    - lookback과 window_size를 같은 크기로 하는 것을 권장!!!!!!!!
+    - lookback은 mlp에 입력으로 들어오는 step 개수
+    - window size는 lstm에 필요
     """
     def __init__(
         self,
@@ -41,7 +41,8 @@ class Observation:
         include_spread: bool   = False,
         include_ohlcv: bool    = False,
         include_tech:bool      = False,
-        window_size: int       = 1
+        window_size: int       = 1,
+        tech_dim: int          = 0,
     ):
         self.lob_levels     = lob_levels
         self.lookback       = lookback
@@ -61,7 +62,7 @@ class Observation:
         self.dim_pnl       = 1 if include_pnl else 0
         self.dim_spread    = 1 if include_spread else 0
         self.dim_ohlcv     = 5 if include_ohlcv else 0
-        self.dim_tech      = 5 if include_tech else 0
+        self.dim_tech      = tech_dim if include_tech else 0
 
         self.dim_total = (
             self.dim_snapshots

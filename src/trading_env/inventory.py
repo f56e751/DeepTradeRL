@@ -1,5 +1,6 @@
 from typing import Dict
-from src.env.transaction_info import TransactionInfo,TradeType
+from .transaction_info import TransactionInfo, TradeType
+
 
 class Inventory:
     """
@@ -32,14 +33,14 @@ class Inventory:
         구매 확정된 주식 수를 반환
         """
         if not self.can_buy(ticker, qty, price):
-            self.transaction_info.set_new_val(trade_type=TradeType.BUY, quantity=0, realized_pnl = 0)
+            self.transaction_info.set_new_val(trade_type=TradeType.BUY, quantity=0, realized_pnl = 0, price = None)
             return self.transaction_info
         cost = qty * price
         self.cash -= cost
         self.positions[ticker] = self.positions.get(ticker, 0) + qty
         self.cost_basis[ticker] = self.cost_basis.get(ticker, 0.0) + cost # 해당 ticker가 없으면 0 반환
         # return qty
-        self.transaction_info.set_new_val(trade_type=TradeType.BUY, quantity=qty, realized_pnl = 0)
+        self.transaction_info.set_new_val(trade_type=TradeType.BUY, quantity=qty, realized_pnl = 0, price = price)
         return self.transaction_info
 
     def sell(self, ticker: str, qty: int, price: float) -> int:
@@ -49,7 +50,7 @@ class Inventory:
         pnl을 반환함
         """
         if not self.can_sell(ticker, qty):
-            self.transaction_info.set_new_val(trade_type=TradeType.SELL, quantity=0, realized_pnl = 0)
+            self.transaction_info.set_new_val(trade_type=TradeType.SELL, quantity=0, realized_pnl = 0, price = None)
             return self.transaction_info
         # 평균 취득 단가
         total_qty = self.positions[ticker]
@@ -67,7 +68,7 @@ class Inventory:
             del self.positions[ticker]
             del self.cost_basis[ticker]
         # return qty
-        self.transaction_info.set_new_val(trade_type=TradeType.SELL, quantity=qty, realized_pnl=realized_pnl)
+        self.transaction_info.set_new_val(trade_type=TradeType.SELL, quantity=qty, realized_pnl=realized_pnl, price = price)
         return self.transaction_info
     
     def get_unrealized_pnl(self, price_map: Dict[str, float]) -> float:

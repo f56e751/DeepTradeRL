@@ -1,9 +1,13 @@
 # test_stock_env.py
 
 import pandas as pd
-from src.data_handler.csv_folder_loader import CSVFolderLoader
-from src.data_handler.data_handler import MultiDataHandler
-from src.env.daily_stock_trading_env import DailyStockTradingEnv
+
+from ..data_handler import CSVFolderLoader, MultiDataHandler
+from ..trading_env import DailyStockTradingEnv
+
+# from src.data_handler.csv_folder_loader import CSVFolderLoader
+# from src.data_handler.data_handler import MultiDataHandler
+# from src.env.daily_stock_trading_env import DailyStockTradingEnv
 
 
 def test_data_handler(folder_path: str, obs_step: int = 0):
