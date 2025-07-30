@@ -15,11 +15,15 @@ JSON_FILE = f"{SYMBOL}_{INTERVAL}_raw_kline_data.jsonl" # .jsonl 확장자는 JS
 
 # --- WebSocket 클라이언트 클래스 정의 ---
 class BinanceKlineClient:
-    def __init__(self, data_queue: queue.Queue):
+    def __init__(self, symbol: str, interval: str, data_queue: queue.Queue):
         self.data_queue = data_queue # 데이터를 저장하는 queue
         self.ws: websocket.WebSocketApp = None # WebSocketApp 인스턴스
         self.stream_thread: threading.Thread = None # 스트림을 실행할 스레드
         self._is_running = False # 스트림이 현재 실행 중인지 상태 추적
+
+        self.symbol = symbol.lower()
+        self.interval = interval
+        self.websocket_url = f"wss://stream.binance.com:9443/ws/{self.symbol}@kline_{self.interval}"
 
     def _on_open(self, ws):
         """WebSocket 연결이 성공적으로 열렸을 때 호출되는 내부 콜백."""
@@ -121,38 +125,3 @@ def save_raw_json_to_file(raw_json_string: str, file_path: str):
         # print(f"JSON 데이터 파일에 추가됨: {datetime.now().strftime('%H:%M:%S')}") # 메시지가 너무 많아 주석 처리
     except Exception as e:
         print(f"JSON 파일 저장 오류: {e}")
-
-# --- 메인 실행 블록 ---
-if __name__ == "__main__":
-    message_queue = queue.Queue() # 메시지를 받을 큐 생성
-    kline_client = BinanceKlineClient(message_queue) # 클라이언트 인스턴스 생성
-
-    try:
-        # 1. WebSocket 스트림 시작 함수 호출
-        kline_client.start_stream()
-
-        print(f"\n'{SYMBOL.upper()}'의 '{INTERVAL}' K-line 원시 데이터를 '{JSON_FILE}'에 저장합니다.")
-        print("--------------------------------------------------------------------------------------------------")
-
-        # 메인 루프에서 데이터 수신 및 저장 (데모를 위해 20초간 실행)
-        run_duration_seconds = 20
-        start_time = time.time()
-
-        while time.time() - start_time < run_duration_seconds:
-            raw_message = get_raw_kline_message(message_queue) # 큐에서 메시지 가져오기
-
-            if raw_message:
-                save_raw_json_to_file(raw_message, JSON_FILE)
-            
-            time.sleep(0.001) # CPU 과부하 방지를 위한 짧은 대기
-
-        print(f"\n{run_duration_seconds}초 동안 데이터 수신 및 저장 완료.")
-
-    except KeyboardInterrupt:
-        print("\n사용자가 프로그램을 종료했습니다 (Ctrl+C).")
-    except Exception as e:
-        print(f"\n메인 루프에서 예상치 못한 오류 발생: {e}")
-    finally:
-        # 2. WebSocket 스트림 종료 함수 호출 (프로그램 종료 시 항상 실행)
-        kline_client.stop_stream()
-        print("프로그램이 종료됩니다.")
