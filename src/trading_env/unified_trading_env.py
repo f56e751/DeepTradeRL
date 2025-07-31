@@ -17,7 +17,7 @@ class UnifiedTradingEnv(gym.Env):
                 df: pd.DataFrame,
                 reward_strategy: Type[RewardStrategy],
                 action_strategy: ActionStrategy,
-                handler_cls: Type[DataHandlerBase],
+                # handler_cls: Type[DataHandlerBase],
                 initial_cash: float = 100000.0,
                 transaction_fee: float = 0.0023,
                 lookback: int = 9,

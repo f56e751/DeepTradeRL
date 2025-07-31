@@ -1,1 +1,1 @@
-from .util import evaluate_model
+from .util import evaluate_model, TrainingMetricsCallback
