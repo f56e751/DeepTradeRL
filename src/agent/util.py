@@ -828,10 +828,10 @@ def plot_training_reward_curves(training_metrics, save_directory, args=None):
     print(f"• PPO policy loss naturally fluctuates (not always decreasing)")
     print(f"• Value loss spikes indicate value function is learning complex patterns")
     print(f"• If losses plateau early, consider:")
-    if args:
-        print(f"  - Increasing learning rate ({args.lr})")
-    else:
-        print(f"  - Increasing learning rate (current)")
+    # if args:
+    #     print(f"  - Increasing learning rate ({args.lr})")
+    # else:
+    #     print(f"  - Increasing learning rate (current)")
     print(f"  - Adjusting entropy coefficient for more exploration")
     print(f"  - Checking if reward signal is informative enough")
     print(f"  - Ensuring sufficient training steps per episode")

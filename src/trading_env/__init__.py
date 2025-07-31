@@ -10,4 +10,4 @@ from .unified_trading_env import UnifiedTradingEnv
 
 from .transaction_info import TransactionInfo, TradeType
 from .rewards import RealizedPnLReward, LogPortfolioReturnReward, CombinedReward
-from .actions import ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy
+from .actions import ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy

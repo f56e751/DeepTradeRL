@@ -3,7 +3,7 @@ from pathlib import Path
 
 from gym import spaces
 
-from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy
+from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy
 from ..data_handler import FeatureEngineer
 
 def test_unified_env_initialization():
@@ -29,8 +29,7 @@ def test_unified_env_initialization():
     env = UnifiedTradingEnv(
         df=df,
         reward_strategy=RealizedPnLReward,       # 또는 LogPortfolioReturnReward
-        action_strategy=ClippedActionStrategy,   # 기본 액션 스케일링 전략
-        handler_cls=None,                        # 지금은 사용 안 함
+        action_strategy=StrictActionStrategy,   # 기본 액션 스케일링 전략
         initial_cash=100000.0,
         transaction_fee=0.0023,
         lookback=9,

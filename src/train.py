@@ -14,9 +14,9 @@ from stable_baselines3.common.logger import configure
 
 from .trading_env import UnifiedTradingEnv
 from .trading_env import RealizedPnLReward, LogPortfolioReturnReward, CombinedReward
-from .trading_env import ClippedActionStrategy, PercentPortfolioStrategy
+from .trading_env import ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy
 from .infrastructure import TrainingStatusCallback, ValidationCallback # , TrainingMetricsCallback, ValidationCallback
-from .agent import TrainingMetricsCallback
+from .agent import TrainingMetricsCallback, plot_training_reward_curves, evaluate_model
 from .data_handler import FeatureEngineer  # 혹은 DataHandlerBase 구현체
 from .model_factory import ModelFactory
 
@@ -42,6 +42,7 @@ reward_map = {
 action_map = {
     "ClippedActionStrategy": ClippedActionStrategy,
     "PercentPortfolioStrategy": PercentPortfolioStrategy,
+    "StrictActionStrategy": StrictActionStrategy
 }
 
 def parse_args():
@@ -118,11 +119,11 @@ def parse_args():
     # 4) 공통 학습 하이퍼파라미터
     # ======================
     parser.add_argument(
-        "--iters", type=int, default=10000,
+        "--iters", type=int, default=1000000,
         help="총 학습 스텝 수"
     )
     parser.add_argument(
-        "--validation_freq", type=int, default=10000,
+        "--validation_freq", type=int, default=1000000,
         help="검증(Validation) 주기 (스텝 단위)"
     )
     parser.add_argument(
@@ -149,11 +150,11 @@ def parse_args():
     # =================================
     # 6) PPO 전용 하이퍼파라미터
     # =================================
-    parser.add_argument("--ppo_gamma",           type=float, default=0.99,    help="PPO 할인율")
-    parser.add_argument("--ppo_lr",              type=float, default=3e-4,    help="PPO 학습률")
-    parser.add_argument("--ppo_ent_coef",        type=float, default=0.0,     help="PPO 엔트로피 계수")
+    parser.add_argument("--ppo_gamma",           type=float, default=0.95,    help="PPO 할인율")
+    parser.add_argument("--ppo_lr",              type=float, default=0.0001,    help="PPO 학습률")
+    parser.add_argument("--ppo_ent_coef",        type=float, default=0.002,     help="PPO 엔트로피 계수")
     parser.add_argument("--ppo_vf_coef",         type=float, default=0.5,     help="PPO 가치 함수 계수")
-    parser.add_argument("--ppo_max_grad_norm",   type=float, default=0.5,     help="PPO 최대 그래디언트 노름")
+    parser.add_argument("--ppo_max_grad_norm",   type=float, default=0.7,     help="PPO 최대 그래디언트 노름")
     parser.add_argument("--ppo_net_arch_pi",     nargs="+", type=int, default=[64,64], help="PPO 정책 네트워크 구조")
     parser.add_argument("--ppo_net_arch_vf",     nargs="+", type=int, default=[64,64], help="PPO 가치 네트워크 구조")
 
@@ -225,7 +226,7 @@ def parse_args():
     )
     parser.add_argument(
         "--action_strategy",
-        choices=["ClippedActionStrategy", "PercentPortfolioStrategy"],
+        choices=["ClippedActionStrategy", "PercentPortfolioStrategy", "StrictActionStrategy"],
         default="ClippedActionStrategy",
         help="사용할 액션 전략 클래스 이름"
     )
@@ -326,7 +327,9 @@ def main(args):
 
     # 2) 로그 디렉토리
     time_str = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-    save_dir = os.path.join(RUNS_DIR, f"{args.algo}_{time_str}")
+    exp_name   = f"{args.algo}_{time_str}"
+    save_dir   = os.path.join(RUNS_DIR, exp_name)
+    # save_dir = os.path.join(RUNS_DIR, f"{args.algo}_{time_str}")
     os.makedirs(save_dir, exist_ok=True)
 
     # —— 학습 파라미터 YAML로 저장
@@ -345,17 +348,16 @@ def main(args):
     )
 
     # 4) 콜백
-    callbacks = CallbackList([
-        TrainingStatusCallback(verbose=1),
-        TrainingMetricsCallback(verbose=0),
-        ValidationCallback(
-            val_env=eval_env,
-            eval_freq=args.validation_freq,
-            n_eval_episodes=3,
-            save_directory=save_dir,
-            verbose=1
-        )
-    ])
+    status_cb  = TrainingStatusCallback(verbose=1)
+    metrics_cb = TrainingMetricsCallback(verbose=0)
+    val_cb     = ValidationCallback(
+        val_env=eval_env,
+        eval_freq=args.validation_freq,
+        n_eval_episodes=1,
+        save_directory=exp_name,
+        verbose=1
+    )
+    callbacks = CallbackList([status_cb, metrics_cb, val_cb])
 
     # 5) 학습
     model.learn(
@@ -367,6 +369,14 @@ def main(args):
     final_path = os.path.join(save_dir, f"{args.algo}_final")
     model.save(final_path)
     print(f"▶️ Done. Model saved to {final_path}")
+
+    # 7) 학습 후 리워드 곡선 플롯
+    training_metrics = metrics_cb.get_metrics()
+    plot_training_reward_curves(training_metrics, exp_name, args)
+
+
+    # 8) 학습 후 test 환경에서 모델 평가
+    evaluate_model(model, test_env, save_directory=exp_name)
 
 
 if __name__ == '__main__':
