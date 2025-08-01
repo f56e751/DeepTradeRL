@@ -55,7 +55,8 @@ def parse_args():
     # ======================
     parser.add_argument(
         "--csv_path", type=str,
-        default="src/db/AAPL_minute_ohlcv_orderbook_2019_01-07_combined.csv",
+        # default="src/db/AAPL_minute_ohlcv_orderbook_2019_01-07_combined.csv",
+        default="src/db/AAPL_minute_ohlcv_2019_01-07_combined.csv",
         help="CSV 파일 경로"
     )
     parser.add_argument(
@@ -119,7 +120,7 @@ def parse_args():
     # 4) 공통 학습 하이퍼파라미터
     # ======================
     parser.add_argument(
-        "--iters", type=int, default=1000000,
+        "--iters", type=int, default=10000,
         help="총 학습 스텝 수"
     )
     parser.add_argument(

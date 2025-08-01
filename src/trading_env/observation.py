@@ -216,10 +216,13 @@ class Observation:
 
 import numpy as np
 from collections import deque
+import numpy as np
+from collections import deque
 
 class ObservationBuffer:
     """
     ObservationBuffer는 시계열 데이터와 순간 데이터를 관리하는 클래스입니다.
+    Gym 환경에서 딕셔너리 형태 또는 평탄화된 벡터 모두 반환할 수 있습니다.
 
     매개변수
     ----------
@@ -236,65 +239,59 @@ class ObservationBuffer:
         self.inst_keys = inst_keys or []      # 순간 키
 
         # lookback 크기의 deque를 사용해 시계열 버퍼 초기화
-        self.buffers = {
-            key: deque(maxlen=lookback)
-            for key in self.ts_keys
-        }
+        self.buffers = {key: deque(maxlen=lookback) for key in self.ts_keys}
         # 순간 데이터는 최신 값만 저장
         self.current = {key: None for key in self.inst_keys}
 
     def update(self, data: dict):
         """
         새로운 데이터를 받아 버퍼와 현재 값에 업데이트합니다.
-
-        매개변수
-        ----------
-        data : dict
-            ts_keys와 inst_keys에 정의된 모든 키를 포함해야 합니다.
-            - 시계열 키: 리스트나 배열 형식의 값
-            - 순간 키: 스칼라나 배열 형식의 값
         """
-        # 시계열 데이터 업데이트
         for key in self.ts_keys:
             if key not in data:
                 raise KeyError(f"시계열 키 누락: {key}")
-            # 입력 데이터를 복사하여 deque에 추가
             self.buffers[key].append(np.array(data[key], dtype=float))
-
-        # 순간 데이터 업데이트
         for key in self.inst_keys:
             if key not in data:
                 raise KeyError(f"순간 키 누락: {key}")
             self.current[key] = np.array(data[key], dtype=float)
 
-    def get_observation(self):
+    def get_observation_dict(self) -> dict:
         """
-        현재 관찰(observation)을 반환합니다.
-
-        반환값
-        -------
-        obs : dict
-            - ts_keys: (lookback, ...) 형태의 numpy 배열
-            - inst_keys: 배열 또는 스칼라 값
+        현재 시계열과 순간 데이터를 딕셔너리 형태로 반환합니다.
+        {key: np.ndarray} 구조
         """
         obs = {}
+        # 시계열 버퍼를 (lookback, dim) 배열로 반환
         for key in self.ts_keys:
             buf = list(self.buffers[key])
-            # 버퍼가 완전히 채워지지 않았으면 앞부분을 0으로 패딩
             if len(buf) < self.lookback:
                 feat_shape = buf[0].shape if buf else (1,)
                 padding = [np.zeros(feat_shape, dtype=float)] * (self.lookback - len(buf))
                 buf = padding + buf
-            # 타임스텝 축 방향으로 쌓기
             obs[key] = np.stack(buf, axis=0)
-
+        # 순간 값 반환
         for key in self.inst_keys:
             val = self.current.get(key)
             if val is None:
                 raise ValueError(f"순간 키 '{key}'가 설정되지 않았습니다.")
             obs[key] = val
-
         return obs
+
+    def get_observation_vector(self) -> np.ndarray:
+        """
+        현재 관측을 평탄화된 벡터로 반환합니다.
+        shape=(sum(lookback*dim_ts + dim_inst),)
+        """
+        parts = []
+        d = self.get_observation_dict()
+        # 시계열 평탄화
+        for key in self.ts_keys:
+            parts.append(d[key].flatten())
+        # 순간 값 평탄화
+        for key in self.inst_keys:
+            parts.append(np.array(d[key], dtype=float).flatten())
+        return np.concatenate(parts, axis=0)
 
     def reset(self):
         """
@@ -313,15 +310,16 @@ if __name__ == "__main__":
         ts_keys=['ohlcv', 'orderbook'],
         inst_keys=['position', 'pnl']
     )
-
-    # 예시 데이터 업데이트 및 관찰 출력
     for t in range(7):
         data = {
-            'ohlcv': [100 + t, 101 + t, 99 + t, 100 + t, 500 + 10*t],  # [open, high, low, close, volume]
-            'orderbook': [1.0*t, 2.0*t, 3.0*t],                         # [bid, ask, spread]
-            'position': t % 2,                                           # 현재 포지션
-            'pnl': (t * 10.0)                                            # PnL
+            'ohlcv': [100 + t, 101 + t, 99 + t, 100 + t, 500 + 10*t],
+            'orderbook': [1.0*t, 2.0*t, 3.0*t],
+            'position': t % 2,
+            'pnl': (t * 10.0)
         }
         buf.update(data)
-        obs = buf.get_observation()
-        print(f"시간 {t}, ohlcv 버퍼 형태: {obs['ohlcv'].shape}, position: {obs['position']}")
+        obs_dict = buf.get_observation_dict()
+        print(f"시간 {t}, ohlcv 버퍼 형태: {obs_dict['ohlcv'].shape}, position: {obs_dict['position']}")
+        obs_vec = buf.get_observation_vector()
+        print(obs_vec)
+        print(f"Flat vector shape: {obs_vec.shape}")
