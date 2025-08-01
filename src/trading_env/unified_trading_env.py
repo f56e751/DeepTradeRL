@@ -24,10 +24,11 @@ class UnifiedTradingEnv(gym.Env):
                 lob_levels: int = 0,
                 h_max: int = 1,
                 hold_threshold: float = 0.2,
-                include_ohlcv: Optional[bool] = False,
+                include_ohlcv: Optional[bool] = True,
                 include_tech: Optional[bool] = False,
-                include_pnl: Optional[bool] = False,
+                include_pnl: Optional[bool] = True,
                 include_spread: Optional[bool] = False,
+                include_orderbook: Optional[bool] = True,
                 tech_dim: Optional[int] = 0
                 ):
         
@@ -105,15 +106,16 @@ class UnifiedTradingEnv(gym.Env):
         # 2) 피처 리스트 조립
         feats = []
 
-        # — OHLCV 추가
-        if self.observation.include_ohlcv:
-            feats.extend([
-                row["open"],
-                row["high"],
-                row["low"],
-                row["close"],
-                row["volume"],
-            ])
+        # # — OHLCV 추가
+        # if self.observation.include_ohlcv:
+        #     feats.extend([
+        #         row["open"],
+        #         row["high"],
+        #         row["low"],
+        #         row["close"],
+        #         row["volume"],
+        #     ])
+        feats = row.drop(["timestamp","tic"]).tolist()
 
         # — 기술지표 추가 (데이터프레임의 마지막 tech_dim 컬럼에서 가져온다고 가정)
         if self.observation.include_tech and getattr(self.observation, "tech_dim", 0) > 0:

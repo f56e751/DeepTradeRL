@@ -212,3 +212,116 @@ class Observation:
             return (self.window_size, self.dim_total)
         else:
             raise ValueError(f"알 수 없는 InputType: {input_type}")
+
+
+import numpy as np
+from collections import deque
+
+class ObservationBuffer:
+    """
+    ObservationBuffer는 시계열 데이터와 순간 데이터를 관리하는 클래스입니다.
+
+    매개변수
+    ----------
+    lookback : int
+        보관할 과거 타임스텝 수입니다.
+    ts_keys : list of str
+        시계열로 버퍼링할 키 목록입니다 (예: 'ohlcv', 'orderbook').
+    inst_keys : list of str
+        순간적으로 반환할 키 목록입니다 (예: 'position', 'pnl').
+    """
+    def __init__(self, lookback, ts_keys=None, inst_keys=None):
+        self.lookback = lookback
+        self.ts_keys = ts_keys or []          # 시계열 키
+        self.inst_keys = inst_keys or []      # 순간 키
+
+        # lookback 크기의 deque를 사용해 시계열 버퍼 초기화
+        self.buffers = {
+            key: deque(maxlen=lookback)
+            for key in self.ts_keys
+        }
+        # 순간 데이터는 최신 값만 저장
+        self.current = {key: None for key in self.inst_keys}
+
+    def update(self, data: dict):
+        """
+        새로운 데이터를 받아 버퍼와 현재 값에 업데이트합니다.
+
+        매개변수
+        ----------
+        data : dict
+            ts_keys와 inst_keys에 정의된 모든 키를 포함해야 합니다.
+            - 시계열 키: 리스트나 배열 형식의 값
+            - 순간 키: 스칼라나 배열 형식의 값
+        """
+        # 시계열 데이터 업데이트
+        for key in self.ts_keys:
+            if key not in data:
+                raise KeyError(f"시계열 키 누락: {key}")
+            # 입력 데이터를 복사하여 deque에 추가
+            self.buffers[key].append(np.array(data[key], dtype=float))
+
+        # 순간 데이터 업데이트
+        for key in self.inst_keys:
+            if key not in data:
+                raise KeyError(f"순간 키 누락: {key}")
+            self.current[key] = np.array(data[key], dtype=float)
+
+    def get_observation(self):
+        """
+        현재 관찰(observation)을 반환합니다.
+
+        반환값
+        -------
+        obs : dict
+            - ts_keys: (lookback, ...) 형태의 numpy 배열
+            - inst_keys: 배열 또는 스칼라 값
+        """
+        obs = {}
+        for key in self.ts_keys:
+            buf = list(self.buffers[key])
+            # 버퍼가 완전히 채워지지 않았으면 앞부분을 0으로 패딩
+            if len(buf) < self.lookback:
+                feat_shape = buf[0].shape if buf else (1,)
+                padding = [np.zeros(feat_shape, dtype=float)] * (self.lookback - len(buf))
+                buf = padding + buf
+            # 타임스텝 축 방향으로 쌓기
+            obs[key] = np.stack(buf, axis=0)
+
+        for key in self.inst_keys:
+            val = self.current.get(key)
+            if val is None:
+                raise ValueError(f"순간 키 '{key}'가 설정되지 않았습니다.")
+            obs[key] = val
+
+        return obs
+
+    def reset(self):
+        """
+        모든 버퍼와 순간 데이터를 초기화합니다.
+        """
+        for key in self.ts_keys:
+            self.buffers[key].clear()
+        for key in self.inst_keys:
+            self.current[key] = None
+
+# 사용 예시
+if __name__ == "__main__":
+    lookback = 5
+    buf = ObservationBuffer(
+        lookback=lookback,
+        ts_keys=['ohlcv', 'orderbook'],
+        inst_keys=['position', 'pnl']
+    )
+
+    # 예시 데이터 업데이트 및 관찰 출력
+    for t in range(7):
+        data = {
+            'ohlcv': [100 + t, 101 + t, 99 + t, 100 + t, 500 + 10*t],  # [open, high, low, close, volume]
+            'orderbook': [1.0*t, 2.0*t, 3.0*t],                         # [bid, ask, spread]
+            'position': t % 2,                                           # 현재 포지션
+            'pnl': (t * 10.0)                                            # PnL
+        }
+        buf.update(data)
+        obs = buf.get_observation()
+        print(f"시간 {t}, ohlcv 버퍼 형태: {obs['ohlcv'].shape}, position: {obs['position']}")

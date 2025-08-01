@@ -54,9 +54,9 @@ def parse_args():
     # 1) 데이터 & 환경 설정
     # ======================
     parser.add_argument(
-        "--ohlcv_csv_path", type=str,
-        default="src/db/AAPL_minute_ohlcv_2019_01-07_combined.csv",
-        help="OHLCV 데이터 CSV 파일 경로"
+        "--csv_path", type=str,
+        default="src/db/AAPL_minute_ohlcv_orderbook_2019_01-07_combined.csv",
+        help="CSV 파일 경로"
     )
     parser.add_argument(
         "--include_tech", action="store_true",
@@ -75,7 +75,7 @@ def parse_args():
         help="관찰 히스토리 길이 (lookback window)"
     )
     parser.add_argument(
-        "--lob_levels", type=int, default=0,
+        "--lob_levels", type=int, default=10,
         help="Order Book 레벨 수"
     )
     parser.add_argument(
@@ -300,7 +300,7 @@ def main(args):
 
     # 1) 학습/검증 환경
     # TODO 이 부분에서 바로 csv를 읽어올지 아니면 여러 csv를 합칠지 결정하기
-    raw_df = pd.read_csv(args.ohlcv_csv_path, parse_dates=['timestamp'])
+    raw_df = pd.read_csv(args.csv_path, parse_dates=['timestamp'])
     fe     = FeatureEngineer(use_technical_indicator=args.include_tech,
                              tech_indicator_list=None,
                              use_turbulence=False,
