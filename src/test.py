@@ -82,12 +82,16 @@ def main():
     result_dir = os.path.join(args.model_dir, 'test_results')
     os.makedirs(result_dir, exist_ok=True)
 
+    # evaluate_model 호출 시, 내부에서 'runs/'가 붙으므로
+    # save_directory에는 'runs/' 이후 부분(모델명/test_results)만 전달
+    rel_save_dir = os.path.join(os.path.basename(args.model_dir), 'test_results')
+
     # 에이전트 평가 수행 (dataset_name 지정)
     evaluate_model(
         model,
         test_env,
         dataset_name="test",
-        save_directory=result_dir
+        save_directory=rel_save_dir
     )
 
 if __name__ == '__main__':
