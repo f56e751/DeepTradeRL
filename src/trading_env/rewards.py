@@ -59,6 +59,7 @@ class LogPortfolioReturnReward(RewardStrategy):
     """포트폴리오 가치의 로그수익률: r_t = ln(p_t / p_{t-1})"""
     def compute(self, tx, current_portfolio_value: float) -> float:
         prev = self.prev_portfolio_value
+        self.prev_portfolio_value = current_portfolio_value
         # zero-division 방지
         if prev <= 0 or current_portfolio_value <= 0:
             return 0.0
