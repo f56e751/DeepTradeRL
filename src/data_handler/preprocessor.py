@@ -95,6 +95,10 @@ class FeatureEngineer:
 
         # fill the missing values at the beginning and the end
         df = df.ffill().bfill()
+
+        # 스케일링 (숫자형 컬럼에 대해 min-max normalization 적용)
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].apply(lambda x: (x - x.min()) / (x.max() - x.min()))
         return df
 
     def clean_data(self, data):
