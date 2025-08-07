@@ -78,11 +78,16 @@ def main():
     model_path = os.path.join(args.model_dir, f"{algo}_final")
     model = ModelClass.load(model_path, env=test_env, device=params_ns.device)
 
-    # 모델 평가 수행
+    # 결과 저장용 폴더 생성 (model_dir 안에 'test_results' 디렉터리)
+    result_dir = os.path.join(args.model_dir, 'test_results')
+    os.makedirs(result_dir, exist_ok=True)
+
+    # 에이전트 평가 수행 (dataset_name 지정)
     evaluate_model(
         model,
         test_env,
-        save_directory=args.model_dir
+        dataset_name="test",
+        save_directory=result_dir
     )
 
 if __name__ == '__main__':
