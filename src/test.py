@@ -94,5 +94,8 @@ def main():
         save_directory=rel_save_dir
     )
 
+
+# 사용법
+# python -m src.test --model_dir runs/ppo_20250801_192004
 if __name__ == '__main__':
     main()
