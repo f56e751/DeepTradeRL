@@ -15,6 +15,7 @@ from stable_baselines3.common.logger import configure
 from .trading_env import UnifiedTradingEnv
 from .trading_env import RealizedPnLReward, LogPortfolioReturnReward, CombinedReward
 from .trading_env import ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy
+from .trading_env import NormalizationWrapper
 from .infrastructure import TrainingStatusCallback, ValidationCallback # , TrainingMetricsCallback, ValidationCallback
 from .agent import TrainingMetricsCallback, plot_training_reward_curves, evaluate_model
 from .data_handler import FeatureEngineer  # 혹은 DataHandlerBase 구현체
