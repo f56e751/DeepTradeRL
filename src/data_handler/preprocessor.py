@@ -65,7 +65,7 @@ class FeatureEngineer:
         self.use_turbulence = use_turbulence
         self.user_defined_feature = user_defined_feature
 
-    def preprocess_data(self, df, scaling=True):
+    def preprocess_data(self, df, scaling=False):
         """main method to do the feature engineering
         @:param config: source dataframe
         @:return: a DataMatrices object

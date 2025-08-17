@@ -3,7 +3,7 @@ from pathlib import Path
 
 from gym import spaces
 
-from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy
+from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy, NormalizationWrapper
 from ..data_handler import FeatureEngineer
 
 def test_unified_env_initialization():
@@ -42,6 +42,7 @@ def test_unified_env_initialization():
         include_spread=False,
         tech_dim=0
     )
+    env = NormalizationWrapper(env)  # 필요시 정규화 래퍼 적용
 
     # 4) observation / action_space 타입 검사
     obs = env.reset()
@@ -66,6 +67,7 @@ def test_unified_env_initialization():
     for _ in range(n_steps):
         action = env.action_space.sample()
         obs2, reward2, done2, info2 = env.step(action)
+        print(obs2)
         assert isinstance(reward2, float)
         assert set(info2.keys()) >= {"cash","position","invalid"}
         if done2:

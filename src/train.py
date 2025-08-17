@@ -55,8 +55,8 @@ def parse_args():
     # ======================
     parser.add_argument(
         "--csv_path", type=str,
-        # default="src/db/AAPL_minute_ohlcv_orderbook_2019_01-07_combined.csv",
-        default="src/db/AAPL_minute_ohlcv_2019_01-07_combined.csv",
+        default="src/db/AAPL_minute_ohlcv_orderbook_2019_01-07_combined.csv",
+        # default="src/db/AAPL_minute_ohlcv_2019_01-07_combined.csv",
         help="CSV 파일 경로"
     )
     parser.add_argument(
@@ -286,6 +286,21 @@ def make_env_from_df(df: pd.DataFrame, args) -> UnifiedTradingEnv:
 #     return env
 
 
+def test_df(args):
+    raw_df = pd.read_csv(args.csv_path, parse_dates=['timestamp'])
+    fe     = FeatureEngineer(use_technical_indicator=args.include_tech,
+                             tech_indicator_list=None,
+                             use_turbulence=False,
+                             user_defined_feature=False)
+    
+    # TODO 이 부분 수정하기
+    if "tic" not in raw_df.columns:
+        raw_df["tic"] = "AAPL"
+    df_all = fe.preprocess_data(raw_df)
+
+    print(df_all)
+
+
 def main(args):
     # 0) sanity‐check split ratios
     total = args.train_ratio + args.val_ratio + args.test_ratio
@@ -321,9 +336,9 @@ def main(args):
     df_test  = df_all.iloc[n_train + n_val :]
 
     # now instantiate three envs from those splits
-    train_env = make_env_from_df(df_train, args)
-    eval_env  = make_env_from_df(df_val,   args)
-    test_env  = make_env_from_df(df_test,  args)
+    train_env = NormalizationWrapper(make_env_from_df(df_train, args))
+    eval_env  = NormalizationWrapper(make_env_from_df(df_val,   args))
+    test_env  = NormalizationWrapper(make_env_from_df(df_test,  args))
 
 
     # 2) 로그 디렉토리
@@ -384,3 +399,4 @@ if __name__ == '__main__':
     args = parse_args()
     torch.use_deterministic_algorithms(True)
     main(args)
+    # test_df(args)
