@@ -212,3 +212,114 @@ class Observation:
             return (self.window_size, self.dim_total)
         else:
             raise ValueError(f"알 수 없는 InputType: {input_type}")
+
+
+import numpy as np
+from collections import deque
+import numpy as np
+from collections import deque
+
+class ObservationBuffer:
+    """
+    ObservationBuffer는 시계열 데이터와 순간 데이터를 관리하는 클래스입니다.
+    Gym 환경에서 딕셔너리 형태 또는 평탄화된 벡터 모두 반환할 수 있습니다.
+
+    매개변수
+    ----------
+    lookback : int
+        보관할 과거 타임스텝 수입니다.
+    ts_keys : list of str
+        시계열로 버퍼링할 키 목록입니다 (예: 'ohlcv', 'orderbook').
+    inst_keys : list of str
+        순간적으로 반환할 키 목록입니다 (예: 'position', 'pnl').
+    """
+    def __init__(self, lookback, ts_keys=None, inst_keys=None):
+        self.lookback = lookback
+        self.ts_keys = ts_keys or []          # 시계열 키
+        self.inst_keys = inst_keys or []      # 순간 키
+
+        # lookback 크기의 deque를 사용해 시계열 버퍼 초기화
+        self.buffers = {key: deque(maxlen=lookback) for key in self.ts_keys}
+        # 순간 데이터는 최신 값만 저장
+        self.current = {key: None for key in self.inst_keys}
+
+    def update(self, data: dict):
+        """
+        새로운 데이터를 받아 버퍼와 현재 값에 업데이트합니다.
+        """
+        for key in self.ts_keys:
+            if key not in data:
+                raise KeyError(f"시계열 키 누락: {key}")
+            self.buffers[key].append(np.array(data[key], dtype=float))
+        for key in self.inst_keys:
+            if key not in data:
+                raise KeyError(f"순간 키 누락: {key}")
+            self.current[key] = np.array(data[key], dtype=float)
+
+    def get_observation_dict(self) -> dict:
+        """
+        현재 시계열과 순간 데이터를 딕셔너리 형태로 반환합니다.
+        {key: np.ndarray} 구조
+        """
+        obs = {}
+        # 시계열 버퍼를 (lookback, dim) 배열로 반환
+        for key in self.ts_keys:
+            buf = list(self.buffers[key])
+            if len(buf) < self.lookback:
+                feat_shape = buf[0].shape if buf else (1,)
+                padding = [np.zeros(feat_shape, dtype=float)] * (self.lookback - len(buf))
+                buf = padding + buf
+            obs[key] = np.stack(buf, axis=0)
+        # 순간 값 반환
+        for key in self.inst_keys:
+            val = self.current.get(key)
+            if val is None:
+                raise ValueError(f"순간 키 '{key}'가 설정되지 않았습니다.")
+            obs[key] = val
+        return obs
+
+    def get_observation_vector(self) -> np.ndarray:
+        """
+        현재 관측을 평탄화된 벡터로 반환합니다.
+        shape=(sum(lookback*dim_ts + dim_inst),)
+        """
+        parts = []
+        d = self.get_observation_dict()
+        # 시계열 평탄화
+        for key in self.ts_keys:
+            parts.append(d[key].flatten())
+        # 순간 값 평탄화
+        for key in self.inst_keys:
+            parts.append(np.array(d[key], dtype=float).flatten())
+        return np.concatenate(parts, axis=0)
+
+    def reset(self):
+        """
+        모든 버퍼와 순간 데이터를 초기화합니다.
+        """
+        for key in self.ts_keys:
+            self.buffers[key].clear()
+        for key in self.inst_keys:
+            self.current[key] = None
+
+# 사용 예시
+if __name__ == "__main__":
+    lookback = 5
+    buf = ObservationBuffer(
+        lookback=lookback,
+        ts_keys=['ohlcv', 'orderbook'],
+        inst_keys=['position', 'pnl']
+    )
+    for t in range(7):
+        data = {
+            'ohlcv': [100 + t, 101 + t, 99 + t, 100 + t, 500 + 10*t],
+            'orderbook': [1.0*t, 2.0*t, 3.0*t],
+            'position': t % 2,
+            'pnl': (t * 10.0)
+        }
+        buf.update(data)
+        obs_dict = buf.get_observation_dict()
+        print(f"시간 {t}, ohlcv 버퍼 형태: {obs_dict['ohlcv'].shape}, position: {obs_dict['position']}")
+        obs_vec = buf.get_observation_vector()
+        print(obs_vec)
+        print(f"Flat vector shape: {obs_vec.shape}")

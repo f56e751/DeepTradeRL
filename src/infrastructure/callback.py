@@ -6,6 +6,10 @@ import pandas as pd
 from tqdm import tqdm
 import time
 
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+
 
 
 class TrainingStatusCallback(BaseCallback):
@@ -79,3 +83,97 @@ class TrainingStatusCallback(BaseCallback):
         print(f"Total Episodes: {len(self.episode_rewards)}")
         print(f"Total Timesteps: {self.num_timesteps}")
         print(f"\nSummary saved to: {summary_path}")
+    
+
+class ValidationCallback(BaseCallback):
+    """
+    Callback for performing validation during training
+    """
+    def __init__(self, val_env, eval_freq=1000, n_eval_episodes=1, save_directory=None, verbose=0):
+        super(ValidationCallback, self).__init__(verbose)
+        self.val_env = val_env
+        self.eval_freq = eval_freq
+        self.n_eval_episodes = n_eval_episodes
+        self.save_directory = save_directory
+        self.validation_rewards = []
+        self.validation_timesteps = []
+        self.best_mean_reward = -float('inf')
+        
+    def _on_step(self) -> bool:
+        if self.n_calls % self.eval_freq == 0:
+            # Perform validation
+            episode_rewards = []
+            
+            for _ in range(self.n_eval_episodes):
+                obs = self.val_env.reset()
+                if isinstance(obs, tuple):
+                    obs = obs[0]
+                    
+                done = False
+                episode_reward = 0
+                
+                while not done:
+                    action, _ = self.model.predict(obs, deterministic=True)
+                    obs, reward, done, info = self.val_env.step(action)
+                    if isinstance(obs, tuple):
+                        obs = obs[0]
+                    if isinstance(done, tuple):
+                        done = done[0] if len(done) > 0 else done
+                    episode_reward += reward
+                    
+                episode_rewards.append(episode_reward)
+            
+            mean_reward = np.mean(episode_rewards)
+            std_reward = np.std(episode_rewards)
+            
+            self.validation_rewards.append(mean_reward)
+            self.validation_timesteps.append(self.n_calls)
+            
+            if self.verbose > 0:
+                print(f"\n📊 Validation at step {self.n_calls}: Mean reward: {mean_reward:.2f} ± {std_reward:.2f}")
+            
+            # Save best model
+            if mean_reward > self.best_mean_reward:
+                self.best_mean_reward = mean_reward
+                if self.save_directory:
+                    best_model_path = os.path.join('runs', self.save_directory, 'best_model')
+                    self.model.save(best_model_path)
+                    if self.verbose > 0:
+                        print(f"🏆 New best model saved! Reward: {mean_reward:.2f}")
+            
+        return True
+    
+    def _on_training_end(self) -> None:
+        """Called at the end of training to save validation plots"""
+        if len(self.validation_rewards) > 0 and self.save_directory:
+            try:
+                # Plot validation curve
+                plt.figure(figsize=(10, 6))
+                plt.plot(self.validation_timesteps, self.validation_rewards, 'b-', linewidth=2, label='Validation Reward')
+                plt.xlabel('Training Steps')
+                plt.ylabel('Mean Episode Reward')
+                plt.title('Validation Performance During Training')
+                plt.legend()
+                plt.grid(True, alpha=0.3)
+                
+                # Save plot without showing
+                plot_path = os.path.join('runs', self.save_directory, 'validation_curve.png')
+                plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+                plt.close()  # Important: close the figure to free memory
+                
+                if self.verbose > 0:
+                    print(f"📈 Validation curve saved to: {plot_path}")
+                    print(f"🏆 Best validation reward: {self.best_mean_reward:.2f}")
+            except Exception as e:
+                if self.verbose > 0:
+                    print(f"⚠️ Warning: Could not save validation plot: {e}")
+                # Make sure to close any open figures
+                plt.close('all')
+    
+    def get_validation_data(self):
+        """Return validation data for analysis"""
+        return {
+            'timesteps': self.validation_timesteps,
+            'rewards': self.validation_rewards,
+            'best_reward': self.best_mean_reward
+        }

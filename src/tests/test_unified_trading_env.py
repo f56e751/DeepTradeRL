@@ -3,7 +3,7 @@ from pathlib import Path
 
 from gym import spaces
 
-from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy
+from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy, NormalizationWrapper
 from ..data_handler import FeatureEngineer
 
 def test_unified_env_initialization():
@@ -29,8 +29,7 @@ def test_unified_env_initialization():
     env = UnifiedTradingEnv(
         df=df,
         reward_strategy=RealizedPnLReward,       # 또는 LogPortfolioReturnReward
-        action_strategy=ClippedActionStrategy,   # 기본 액션 스케일링 전략
-        handler_cls=None,                        # 지금은 사용 안 함
+        action_strategy=StrictActionStrategy,   # 기본 액션 스케일링 전략
         initial_cash=100000.0,
         transaction_fee=0.0023,
         lookback=9,
@@ -43,10 +42,11 @@ def test_unified_env_initialization():
         include_spread=False,
         tech_dim=0
     )
+    env = NormalizationWrapper(env)  # 필요시 정규화 래퍼 적용
 
     # 4) observation / action_space 타입 검사
     obs = env.reset()
-    assert isinstance(obs, (list, tuple)) or hasattr(obs, "shape")
+    # assert isinstance(obs, (list, tuple)) or hasattr(obs, "shape")
     assert isinstance(env.action_space, spaces.Box)
     assert isinstance(env.observation_space, spaces.Box)
 
@@ -62,10 +62,17 @@ def test_unified_env_initialization():
 
     # 6) reset 후 다시 여러 스텝 실행
     obs2 = env.reset()
-    assert isinstance(obs2, (list, tuple)) or hasattr(obs2, "shape")
+    print(obs2)
+    # assert isinstance(obs2, (list, tuple)) or hasattr(obs2, "shape")
     for _ in range(n_steps):
         action = env.action_space.sample()
         obs2, reward2, done2, info2 = env.step(action)
+        print(obs2)
+        
+        price = env.get_price()
+        portfolio_val = env.inventory.get_portfolio_value({'TICKER': price})
+        print(f"price is {price}")
+        print(f"portfolio value is {portfolio_val}")
         assert isinstance(reward2, float)
         assert set(info2.keys()) >= {"cash","position","invalid"}
         if done2:

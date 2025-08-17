@@ -45,8 +45,38 @@ class TestActionStrategy(ActionStrategy):
             return ActionResult(0, invalid=True)
         if qty < 0 and not inventory.can_sell('TICKER', abs(qty)):
             return ActionResult(0, invalid=True)
-        return ActionResult(qty)
+        return ActionResult(quantity=qty)
 
+class StrictActionStrategy(ActionStrategy):
+    """
+    ClippedActionStrategy와 유사하지만,
+    • 클리핑 없이 desired = int(rint(raw_action * h_max)) 그대로 사용
+    • 거래가 불가능하면 invalid=True 반환
+    """
+
+    def compute(self,raw_action: float,inventory,price: float,h_max: int,hold_thr: float,transaction_fee: float) -> ActionResult:
+        # 1) 홀드 영역 처리
+        if abs(raw_action) < hold_thr:
+            return ActionResult(quantity=0)
+
+        # 2) 원하는 거래 수량 계산 (클리핑 없이)
+        desired = int(np.rint(raw_action * h_max))
+
+        # 3) 거래 가능 여부 검사
+        if desired > 0:
+            # 매수 가능 여부
+            fee = desired * price * transaction_fee
+            feasible = inventory.can_buy('TICKER', desired, price, fee)
+        else:
+            # 매도 가능 여부
+            feasible = inventory.can_sell('TICKER', abs(desired))
+
+        # 4) 불가능할 경우 invalid=True
+        if not feasible:
+            return ActionResult(quantity=0, invalid=True)
+
+        # 5) 가능할 경우 원하는 만큼 그대로 거래
+        return ActionResult(quantity=desired)
 
 
 class ClippedActionStrategy(ActionStrategy):
@@ -63,7 +93,7 @@ class ClippedActionStrategy(ActionStrategy):
             max_sell = abs(inventory.get_position('TICKER'))
             qty = -min(abs(desired), max_sell)
 
-        return ActionResult(qty)
+        return ActionResult(quantity=qty)
 
 
 
@@ -77,5 +107,5 @@ class PercentPortfolioStrategy(ActionStrategy):
         qty = int(delta / price)
         # +/-만큼 사고/팔되, feasibility는 Clipped 전략처럼 처리
         # (여기선 단순화)
-        return ActionResult(qty)
+        return ActionResult(quantity=qty)
 
