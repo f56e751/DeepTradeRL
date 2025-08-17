@@ -68,6 +68,11 @@ def test_unified_env_initialization():
         action = env.action_space.sample()
         obs2, reward2, done2, info2 = env.step(action)
         print(obs2)
+        
+        price = env.get_price()
+        portfolio_val = env.inventory.get_portfolio_value({'TICKER': price})
+        print(f"price is {price}")
+        print(f"portfolio value is {portfolio_val}")
         assert isinstance(reward2, float)
         assert set(info2.keys()) >= {"cash","position","invalid"}
         if done2:

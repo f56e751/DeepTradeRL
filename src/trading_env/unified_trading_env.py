@@ -202,7 +202,7 @@ class UnifiedTradingEnv(gym.Env):
             elif real_act > 0:
                 qty = real_act
                 tx = self.inventory.buy('TICKER', qty, price)
-                self.inventory.cash -= qty * price * self.transaction_fee
+                # self.inventory.cash -= qty * price * self.transaction_fee
             # real_act == 0: 홀드 (tx remains None)
 
         # 3) 다음 스텝 및 종료 판정

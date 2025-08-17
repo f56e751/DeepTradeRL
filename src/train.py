@@ -121,7 +121,7 @@ def parse_args():
     # 4) 공통 학습 하이퍼파라미터
     # ======================
     parser.add_argument(
-        "--iters", type=int, default=10000,
+        "--iters", type=int, default=1000000,
         help="총 학습 스텝 수"
     )
     parser.add_argument(
