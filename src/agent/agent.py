@@ -61,7 +61,7 @@ class ValidationCallback(BaseCallback):
             episode_rewards = []
             
             for _ in range(self.n_eval_episodes):
-                obs = self.val_env.reset()
+                obs, info = self.val_env.reset()
                 if isinstance(obs, tuple):
                     obs = obs[0]
                     
@@ -70,7 +70,8 @@ class ValidationCallback(BaseCallback):
                 
                 while not done:
                     action, _ = self.model.predict(obs, deterministic=True)
-                    obs, reward, done, info = self.val_env.step(action)
+                    obs, reward, terminated, truncated, info = self.val_env.step(action)
+                    done = terminated or truncated
                     if isinstance(obs, tuple):
                         obs = obs[0]
                     if isinstance(done, tuple):

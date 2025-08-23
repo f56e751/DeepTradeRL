@@ -46,7 +46,7 @@ def main():
         ticker="TEST",
         transaction_fee = 0.0023
     )
-    obs = env.reset()
+    obs, info = env.reset()
 
     # 4) 초기 obs 검증
     base_dim = 2*lob_levels + lookback*(2*lob_levels)
@@ -67,7 +67,8 @@ def main():
     # 5) 랜덤 액션으로 몇 스텝 진행
     for step in range(1, n_steps + 1):
         action = env.action_space.sample()
-        obs, reward, done, info = env.step(action)
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
         print(f"Attempt {step:2d} | Action={action} | Reward={reward:.2f} | Cash={info['cash']:.2f} | Pos={info['position']} | Invalid={info['invalid']} | Obs shape={obs.shape}")
         assert obs.shape == (expected_dim,)
         assert isinstance(reward, float)

@@ -1030,7 +1030,7 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
     h_max = getattr(env, 'h_max', 250)
     
     for episode in range(num_episodes):
-        obs = env.reset()
+        obs, info = env.reset()
         episode_reward = 0
         episode_step_rewards = []
         episode_cumulative_rewards = []
@@ -1058,7 +1058,8 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
             episode_actions.append(raw_action)
             
             # Take the action in the environment
-            obs, reward, done, info = env.step(action)
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
             
             # Record step rewards
             episode_step_rewards.append(reward)

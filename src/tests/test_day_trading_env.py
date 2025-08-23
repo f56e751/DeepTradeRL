@@ -49,7 +49,7 @@ def test_env(df: pd.DataFrame, n_steps: int = 10):
     env = DailyStockTradingEnv(df=df, wanted_features = ['Adj Close', 'MACD', 'RSI', 'CCI', 'ADX'])
 
     # 환경 초기화 및 첫 관측값 확인
-    obs = env.reset()
+    obs, info = env.reset()
     # obs는 [cash, positions..., data_features...] 순서의 벡터
     print(f"env obs dim: {env.get_obs_dim()}")
     print(f"Initial environment observation (shape={env.get_obs_dim()}): {obs}")
@@ -64,7 +64,8 @@ def test_env(df: pd.DataFrame, n_steps: int = 10):
         # - invalid action: 주문 수량 > 보유량(매도), 또는 비용 > 현금(매수)인 경우
         #    → step이 증가하지 않고 reward=0.0, info={'invalid': True} 반환
         # - 정상 action: h_max 비율만큼 주문 실행, 거래 수수료(transaction_fee) 반영
-        obs, reward, done, info = env.step(action)
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
         print(f"Attempt {i:02d} | action: {action} | reward: {reward:.2f} | done: {done} | info: {info}")
 
         if done:

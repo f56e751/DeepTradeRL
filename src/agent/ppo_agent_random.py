@@ -10,8 +10,8 @@ import pandas as pd
 from stable_baselines3 import PPO
 from stable_baselines3.common.logger import configure
 
-import gym
-from gym import spaces
+import gymnasium as gym
+from gymnasium import spaces
 
 import sys
 

@@ -2,7 +2,7 @@
 import os
 import argparse
 
-import gym
+import gymnasium as gym
 import numpy as np
 import pandas as pd
 import torch

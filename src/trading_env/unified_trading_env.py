@@ -1,5 +1,5 @@
-import gym
-from gym import spaces
+import gymnasium as gym
+from gymnasium import spaces
 import numpy as np
 import pandas as pd
 from typing import Type, Optional
@@ -112,7 +112,10 @@ class UnifiedTradingEnv(gym.Env):
         self.obs_dim = obs_dim
 
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
+        if seed is not None:
+            self._np_random, seed = gym.utils.seeding.np_random(seed)
+        
         # 스텝과 인벤토리 초기화
         self.current_step = 0
         self.inventory.reset()
@@ -125,8 +128,13 @@ class UnifiedTradingEnv(gym.Env):
         self.reward_strategy.reset(price_map)
 
         
-        # 첫 관측 생성
-        return self._get_obs()
+        # 첫 관측 생성 및 info 딕셔너리 반환
+        obs = self._get_obs()
+        info = {
+            'cash': self.inventory.get_cash(),
+            'position': self.inventory.get_positions()
+        }
+        return obs, info
 
     def _get_obs(self):
         # 1) 현재 행 가져오기
@@ -221,7 +229,7 @@ class UnifiedTradingEnv(gym.Env):
             'cash': self.inventory.get_cash(),
             'position': self.inventory.get_position('TICKER')
         }
-        return obs, float(reward), done, info
+        return obs, float(reward), done, False, info
 
 
 
@@ -235,5 +243,5 @@ class UnifiedTradingEnv(gym.Env):
         )
 
     def seed(self, seed=None):
-        np.random.seed(seed)
+        self._np_random, seed = gym.utils.seeding.np_random(seed)
         return [seed]

@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import numpy as np
 
 class NormalizationWrapper(gym.Wrapper):
@@ -7,14 +7,15 @@ class NormalizationWrapper(gym.Wrapper):
         
         print("NormalizationWrapper: 관측 데이터의 통계치를 수집합니다...")
         obs_list = []
-        obs = self.env.reset()
+        obs, info = self.env.reset()
         if obs is not None:
             obs_list.append(obs)
         
         done = False
         while not done:
             action = self.env.action_space.sample()
-            obs, _, done, _ = self.env.step(action)
+            obs, reward, terminated, truncated, info = self.env.step(action)
+            done = terminated or truncated
             if obs is not None:
                 obs_list.append(obs)
         
@@ -34,12 +35,12 @@ class NormalizationWrapper(gym.Wrapper):
     def _normalize(self, obs):
         return np.clip((obs - self.obs_min) / self.scale, 0.0, 1.0).astype(np.float32)
 
-    def reset(self):
-        obs = self.env.reset()
-        return self._normalize(obs) if obs is not None else None
+    def reset(self, seed=None, options=None):
+        obs, info = self.env.reset(seed=seed, options=options)
+        return (self._normalize(obs), info) if obs is not None else (None, info)
 
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+        obs, reward, terminated, truncated, info = self.env.step(action)
         if obs is None:
-            return None, reward, done, info
-        return self._normalize(obs), reward, done, info
+            return None, reward, terminated, truncated, info
+        return self._normalize(obs), reward, terminated, truncated, info
