@@ -16,6 +16,12 @@ dependencies:
   - torchaudio
   - stable-baselines3=2.3.2
   - gymnasium>=0.28.1,<0.30  # SB3와 호환되는 범위
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - scipy
+  - pyqt
   - pip:
       - tensorboard
       - shimmy<=0.2.1  # gymnasium <1.0과 호환되도록
+      - stockstats

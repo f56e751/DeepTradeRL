@@ -13,10 +13,11 @@ warnings.filterwarnings('ignore')
 
 class TrainingMetricsCallback(BaseCallback):
     """
-    Callback to collect training metrics for visualization
+    Callback to collect training metrics for visualization and step-wise logging.
     """
     def __init__(self, verbose=0):
         super(TrainingMetricsCallback, self).__init__(verbose)
+        # Episode-level metrics
         self.episode_rewards = []
         self.policy_losses = []
         self.value_losses = []
@@ -25,11 +26,52 @@ class TrainingMetricsCallback(BaseCallback):
         self.timesteps = []
         self.episodes = []
         
+        # Step-level metrics
+        self.step_portfolio_values = []
+        self.step_cash = []
+        self.step_positions = []
+        self.step_actions = []
+        self.step_rewards = []
+        self.step_unrealized_pnl = []
+        
         # Temporary storage for current episode
         self.current_episode_reward = 0
         self.episode_count = 0
         
     def _on_step(self) -> bool:
+        # Ensure we are in a VecEnv context
+        if self.training_env is None:
+            return True
+
+        # Safely get the underlying environment, assuming it's wrapped.
+        # This handles the case where there might be multiple wrappers.
+        underlying_env = self.training_env.envs[0]
+        while hasattr(underlying_env, 'env'):
+            underlying_env = underlying_env.env
+
+        # Log step-wise data
+        # The action is taken *before* the step, so we log it here.
+        raw_action = self.locals['actions'][0]
+        self.step_actions.append(raw_action)
+        
+        # The reward is for the action just taken.
+        reward = self.locals['rewards'][0]
+        self.step_rewards.append(reward)
+
+        # The environment state is updated *after* the step.
+        # We can access the inventory and price from the underlying environment.
+        # Note: This reflects the state *after* the action was taken.
+        cash = underlying_env.inventory.get_cash()
+        position = underlying_env.inventory.get_position('TICKER') # Ticker is hardcoded in env
+        price = underlying_env.get_price()
+        portfolio_value = underlying_env.inventory.get_portfolio_value({'TICKER': price})
+        unrealized_pnl = underlying_env.inventory.get_unrealized_pnl({'TICKER': price})
+
+        self.step_cash.append(cash)
+        self.step_positions.append(position)
+        self.step_portfolio_values.append(portfolio_value)
+        self.step_unrealized_pnl.append(unrealized_pnl)
+
         # Collect episode rewards from the environment info
         infos = self.locals.get('infos', [])
         if infos and len(infos) > 0:
@@ -51,7 +93,6 @@ class TrainingMetricsCallback(BaseCallback):
     def _on_rollout_end(self) -> None:
         # Collect training metrics from logger
         if hasattr(self.model, 'logger') and self.model.logger is not None:
-            # Get the latest training metrics
             log_dict = self.model.logger.name_to_value
             
             if 'train/policy_gradient_loss' in log_dict:
@@ -65,13 +106,13 @@ class TrainingMetricsCallback(BaseCallback):
             if 'train/entropy_loss' in log_dict:
                 self.entropy_losses.append(log_dict['train/entropy_loss'])
             elif 'train/entropy' in log_dict:
-                self.entropy_losses.append(-log_dict['train/entropy'])  # Negative entropy as loss
+                self.entropy_losses.append(-log_dict['train/entropy'])
                 
             if 'train/learning_rate' in log_dict:
                 self.learning_rates.append(log_dict['train/learning_rate'])
     
-    def get_metrics(self):
-        """Return collected metrics"""
+    def get_episode_metrics(self):
+        """Return collected episode-level metrics"""
         return {
             'episode_rewards': self.episode_rewards,
             'policy_losses': self.policy_losses,
@@ -80,6 +121,17 @@ class TrainingMetricsCallback(BaseCallback):
             'learning_rates': self.learning_rates,
             'timesteps': self.timesteps,
             'episodes': self.episodes
+        }
+
+    def get_step_metrics(self):
+        """Return collected step-level metrics"""
+        return {
+            'portfolio_value': self.step_portfolio_values,
+            'cash': self.step_cash,
+            'position': self.step_positions,
+            'action': self.step_actions,
+            'reward': self.step_rewards,
+            'unrealized_pnl': self.step_unrealized_pnl
         }
 
 

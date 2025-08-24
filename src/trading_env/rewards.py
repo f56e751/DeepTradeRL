@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from .inventory import Inventory
 import numpy as np
-from .transaction_info import TransactionInfo
+from .transaction_info import TransactionInfo, TradeType
 
 
 
@@ -47,10 +47,13 @@ class RewardStrategy(ABC):
 
 
 class RealizedPnLReward(RewardStrategy):
-    """거래 시점에만 실현손익(tx.realized_pnl) - 수수료 페널티를 줍니다."""
+    """매도 거래 시점에만 실현손익(tx.realized_pnl) - 수수료 페널티를 줍니다."""
     def compute(self, tx: TransactionInfo, current_portfolio_value: float) -> float:
-        if tx is None:
+        # 매도(sell) 거래가 아니면 보상을 0으로 설정 (tx.quantity < 0 이어야 매도)
+        if tx is None or tx.trade_type == TradeType.BUY:
             return 0.0
+        
+        # 매도 거래일 경우, 실현 손익에서 수수료를 뺀 값을 보상으로 제공
         fee = abs(tx.quantity) * tx.price * self.transaction_fee
         return tx.realized_pnl - fee
 
