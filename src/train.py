@@ -2,7 +2,7 @@
 import os
 import argparse
 
-import gym
+import gymnasium as gym
 import numpy as np
 import pandas as pd
 import torch
@@ -56,8 +56,8 @@ def parse_args():
     # ======================
     parser.add_argument(
         "--csv_path", type=str,
-        default="src/db/AAPL_minute_ohlcv_orderbook_2019_01-07_combined.csv",
-        # default="src/db/AAPL_minute_ohlcv_2019_01-07_combined.csv",
+        # default="src/db/AAPL_minute_ohlcv_orderbook_2019_01-07_combined.csv",
+        default="src/db/AAPL_minute_ohlcv_2019_01-07_combined.csv",
         help="CSV 파일 경로"
     )
     parser.add_argument(
@@ -125,7 +125,7 @@ def parse_args():
         help="총 학습 스텝 수"
     )
     parser.add_argument(
-        "--validation_freq", type=int, default=1000000,
+        "--validation_freq", type=int, default=100000,
         help="검증(Validation) 주기 (스텝 단위)"
     )
     parser.add_argument(
@@ -387,16 +387,48 @@ def main(args):
     model.save(final_path)
     print(f"▶️ Done. Model saved to {final_path}")
 
-    # 7) 학습 후 리워드 곡선 플롯
-    training_metrics = metrics_cb.get_metrics()
-    plot_training_reward_curves(training_metrics, exp_name, args)
+    # 7) 학습 후 로그 저장 및 리워드 곡선 플롯
+    # 에피소드 단위 메트릭 플롯
+    episode_metrics = metrics_cb.get_episode_metrics()
+    plot_training_reward_curves(episode_metrics, exp_name, args)
+
+    # 스텝 단위 상세 로그 저장
+    step_metrics = metrics_cb.get_step_metrics()
+    step_log_df = pd.DataFrame(step_metrics)
+    step_log_path = os.path.join(RUNS_DIR, exp_name, 'training_step_log.csv')
+    step_log_df.to_csv(step_log_path, index=False)
+    print(f"💾 Detailed step-wise training log saved to '{step_log_path}'")
 
 
-    # 8) 학습 후 test 환경에서 모델 평가
-    evaluate_model(model, test_env, save_directory=exp_name)
+    # 8) 학습 후 test 환경에서 모델 평가 및 결과 로깅
+    print("\n" + "="*50)
+    print("FINAL EVALUATION ON TEST SET")
+    print("="*50)
+    results = evaluate_model(model, test_env, save_directory=exp_name)
+
+    # Clean and log the results to a YAML file
+    if results.get('financial_metrics') and results['financial_metrics'] is not None:
+        results['financial_metrics'].pop('portfolio_values', None)
+        results['financial_metrics'].pop('returns', None)
+        results['financial_metrics'].pop('drawdown', None)
+        results['financial_metrics'].pop('step_rewards', None)
+    if results.get('action_stats'):
+        results['action_stats'].pop('raw_actions', None)
+        results['action_stats'].pop('action_types', None)
+    results.pop('step_rewards', None)
+    results.pop('cumulative_rewards', None)
+    results.pop('portfolio_values', None)
+    
+    results_log_path = os.path.join(RUNS_DIR, exp_name, 'test_evaluation_results.yaml')
+    with open(results_log_path, 'w') as file:
+        yaml.dump(results, file)
+    print(f"💾 Test evaluation results saved to '{results_log_path}'")
 
 
 if __name__ == '__main__':
+    # Set environment variable for deterministic CuBLAS operations, as required by PyTorch >= 1.8 and CUDA >= 10.2
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
     args = parse_args()
     torch.use_deterministic_algorithms(True)
     main(args)

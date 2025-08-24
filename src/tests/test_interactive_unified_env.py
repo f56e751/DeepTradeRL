@@ -60,7 +60,7 @@ def run_interactive_test():
         return
 
     # 3. Run the interactive loop
-    obs = env.reset()
+    obs, info = env.reset()
     done = False
     step_count = 0
 
@@ -89,7 +89,8 @@ def run_interactive_test():
             continue
 
         # Take a step in the environment
-        obs, reward, done, info = env.step(action)
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
 
         # Print step results
         print(f"\n--- Step {step_count} Result ---")

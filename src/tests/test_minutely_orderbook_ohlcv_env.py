@@ -27,7 +27,7 @@ def test_merge_and_env(
         hold_threshold = 0.2,
     )
 
-    obs = env.reset()
+    obs, info = env.reset()
 
     # lstm 출력 형식의 경우, obs를 dict로 반환함
     # snapshots가  (ask price, volume) -> 20쌍
@@ -41,7 +41,8 @@ def test_merge_and_env(
     n_steps = 20
     for i in range(n_steps):
         action = env.action_space.sample()
-        obs, reward, done, info = env.step(action)
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
         print(f"Step {i:02d} | action: {action[0]:+.2f} | reward: {reward:.2f} | invalid: {info['invalid']} | position: {info['position']} | cash: {info['cash']:.2f}")
         if done:
             print(f"Reached end at step {i}")
@@ -70,7 +71,7 @@ def test_merge_and_env_tech(
         hold_threshold = 0.2,
     )
 
-    obs = env.reset()
+    obs, info = env.reset()
 
     # lstm 출력 형식의 경우, obs를 dict로 반환함
     # snapshots가  (ask price, volume) -> 20쌍
@@ -84,7 +85,8 @@ def test_merge_and_env_tech(
     n_steps = 20
     for i in range(n_steps):
         action = env.action_space.sample()
-        obs, reward, done, info = env.step(action)
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
         print(f"Step {i:02d} | action: {action[0]:+.2f} | reward: {reward:.2f} | invalid: {info['invalid']} | position: {info['position']} | cash: {info['cash']:.2f}")
         if done:
             print(f"Reached end at step {i}")

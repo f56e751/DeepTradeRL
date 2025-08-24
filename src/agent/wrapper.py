@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import torch
 import numpy as np
 import sys
@@ -41,12 +41,12 @@ class LSTMObsWrapper(gym.Wrapper):
         self.temp_env = env
 
     def reset(self, **kwargs):
-        raw_obs = self.env.reset(**kwargs)
-        return self._make_obs(raw_obs)
+        raw_obs, info = self.env.reset(**kwargs)
+        return self._make_obs(raw_obs), info
 
     def step(self, action):
-        raw_obs, reward, done, info = self.env.step(action)
-        return self._make_obs(raw_obs), reward, done, info
+        raw_obs, reward, terminated, truncated, info = self.env.step(action)
+        return self._make_obs(raw_obs), reward, terminated, truncated, info
 
     def _make_obs(self, obs_dict):
         # --- 1) 패딩하여 (T₀, D_snap) 로 맞추기 ---
@@ -152,12 +152,13 @@ if __name__ == "__main__":
                                  device=device)
 
     # 5) 테스트
-    obs = wrapped_env.reset()
+    obs, info = wrapped_env.reset()
     print(">>> Wrapped obs shape after reset:", obs.shape)
 
     for i in range(5):
         action = wrapped_env.action_space.sample()
-        obs, reward, done, info = wrapped_env.step(action)
+        obs, reward, terminated, truncated, info = wrapped_env.step(action)
+        done = terminated or truncated
         print(f"Step {i} | obs shape: {obs.shape} | reward: {reward:.2f}")
         if done:
             break
