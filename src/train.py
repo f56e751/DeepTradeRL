@@ -88,6 +88,10 @@ def parse_args():
         "--hold_threshold", type=float, default=0.2,
         help="보유 임계치 비율"
     )
+    parser.add_argument(
+        "--include_portfolio_value", action="store_true",
+        help="관측값에 포트폴리오 가치 포함 여부"
+    )
 
     # ======================
     # 2) 데이터 분할 비율
@@ -253,6 +257,7 @@ def make_env_from_df(df: pd.DataFrame, args) -> UnifiedTradingEnv:
         include_tech=args.include_tech,
         include_pnl=True,
         include_spread=False,
+        include_portfolio_value=args.include_portfolio_value,
         tech_dim=len(df.columns) - 5  # or however you compute tech_dim
     )
 
