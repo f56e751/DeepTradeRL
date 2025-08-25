@@ -30,6 +30,7 @@ class UnifiedTradingEnv(gym.Env):
                 include_spread: Optional[bool] = False,
                 include_position: Optional[bool] = True,
                 include_orderbook: Optional[bool] = True,
+                include_portfolio_value: Optional[bool] = True,
                 tech_dim: Optional[int] = 0
                 ):
         
@@ -50,6 +51,7 @@ class UnifiedTradingEnv(gym.Env):
         self.include_pnl = include_pnl
         self.include_spread = include_spread
         self.include_position = include_position
+        self.include_portfolio_value = include_portfolio_value
         # self.include_orderbook = include_orderbook
 
 
@@ -69,12 +71,14 @@ class UnifiedTradingEnv(gym.Env):
 
 
         # handler 생성
-
+        inst_keys=['pnl','position']
+        if self.include_portfolio_value:
+            inst_keys.append('portfolio_value')
         # Observation 생성
         self.observation_buffer = ObservationBuffer(
             lookback=lookback,
             ts_keys=['df'],
-            inst_keys=['pnl','position']
+            inst_keys=inst_keys
         )
 
         # Action 스페이스 설정
@@ -97,6 +101,8 @@ class UnifiedTradingEnv(gym.Env):
             obs_dim += 1           # bid-ask spread
         if include_position:
             obs_dim += 1           # 포지션 정보
+        if self.include_portfolio_value:
+            obs_dim += 1           # 포트폴리오 가치
 
         print("===========================")
         print(obs_dim)
@@ -166,6 +172,12 @@ class UnifiedTradingEnv(gym.Env):
             pnl = self.inventory.get_unrealized_pnl({"TICKER": price})
             data['pnl'] = pnl
             # feats.append(pnl)
+
+        # — 포트폴리오 가치
+        if self.include_portfolio_value:
+            price = float(row["close"])
+            pf_val = self.inventory.get_portfolio_value({"TICKER": price})
+            data['portfolio_value'] = [pf_val]
 
         self.observation_buffer.update(data)
         obs = self.observation_buffer.get_observation_vector()
