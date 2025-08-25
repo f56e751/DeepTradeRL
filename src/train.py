@@ -14,7 +14,7 @@ from stable_baselines3.common.logger import configure
 
 from .trading_env import UnifiedTradingEnv
 from .trading_env import RealizedPnLReward, LogPortfolioReturnReward, CombinedReward
-from .trading_env import ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy
+from .trading_env import ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy, FloatClippedActionStrategy
 from .trading_env import NormalizationWrapper
 from .infrastructure import TrainingStatusCallback, ValidationCallback # , TrainingMetricsCallback, ValidationCallback
 from .agent import TrainingMetricsCallback, plot_training_reward_curves, evaluate_model
@@ -43,7 +43,8 @@ reward_map = {
 action_map = {
     "ClippedActionStrategy": ClippedActionStrategy,
     "PercentPortfolioStrategy": PercentPortfolioStrategy,
-    "StrictActionStrategy": StrictActionStrategy
+    "StrictActionStrategy": StrictActionStrategy,
+    "FloatClippedActionStrategy": FloatClippedActionStrategy,
 }
 
 def parse_args():
@@ -232,7 +233,7 @@ def parse_args():
     )
     parser.add_argument(
         "--action_strategy",
-        choices=["ClippedActionStrategy", "PercentPortfolioStrategy", "StrictActionStrategy"],
+        choices=["ClippedActionStrategy", "PercentPortfolioStrategy", "StrictActionStrategy", "FloatClippedActionStrategy"],
         default="ClippedActionStrategy",
         help="사용할 액션 전략 클래스 이름"
     )

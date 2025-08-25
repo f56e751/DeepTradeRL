@@ -109,3 +109,29 @@ class PercentPortfolioStrategy(ActionStrategy):
         # (여기선 단순화)
         return ActionResult(quantity=qty)
 
+
+class FloatClippedActionStrategy(ActionStrategy):
+    """ClippedActionStrategy와 유사하지만, 소수점 단위(float)로 거래 수량을 계산합니다."""
+    def compute(self, raw_action, inventory, price, h_max, hold_thr, transaction_fee):
+        if abs(raw_action) < hold_thr:
+            return ActionResult(0.0)
+
+        desired = raw_action * h_max  # 정수로 변환하지 않음
+
+        if desired > 0:
+            # 현금 기반 최대 구매량 계산 (소수점 단위)
+            if price <= 0 or (price * (1 + transaction_fee)) <= 0:
+                max_buy = 0.0
+            else:
+                max_buy = inventory.cash / (price * (1 + transaction_fee))
+            
+            qty = min(desired, max_buy)
+        else:
+            # 최대 매도 가능량 (소수점 단위)
+            max_sell = inventory.get_position('TICKER')
+            qty = -min(abs(desired), abs(max_sell))
+
+        return ActionResult(quantity=qty)
+
+
+
