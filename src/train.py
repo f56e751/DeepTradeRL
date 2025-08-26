@@ -13,9 +13,9 @@ from stable_baselines3.common.callbacks import CallbackList, EvalCallback
 from stable_baselines3.common.logger import configure
 
 from .trading_env import UnifiedTradingEnv
-from .trading_env import RealizedPnLReward, LogPortfolioReturnReward, CombinedReward
+from .trading_env import RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ScaledRealizedPnLReward
 from .trading_env import ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy, FloatClippedActionStrategy
-from .trading_env import NormalizationWrapper
+from .trading_env import NormalizationWrapper, PortfolioScalingWrapper
 from .infrastructure import TrainingStatusCallback, ValidationCallback # , TrainingMetricsCallback, ValidationCallback
 from .agent import TrainingMetricsCallback, plot_training_reward_curves, evaluate_model
 from .data_handler import FeatureEngineer  # 혹은 DataHandlerBase 구현체
@@ -39,6 +39,7 @@ reward_map = {
     "RealizedPnLReward": RealizedPnLReward,
     "LogPortfolioReturnReward": LogPortfolioReturnReward,
     "CombinedReward": CombinedReward,
+    "ScaledRealizedPnLReward": ScaledRealizedPnLReward,
 }
 action_map = {
     "ClippedActionStrategy": ClippedActionStrategy,
@@ -92,6 +93,15 @@ def parse_args():
     parser.add_argument(
         "--include_portfolio_value", action="store_true",
         help="관측값에 포트폴리오 가치 포함 여부"
+    )
+    parser.add_argument(
+        "--include_cash", action="store_true",
+        help="관측값에 보유 현금 포함 여부"
+    )
+
+    parser.add_argument(
+        "--wrapper", type=str, choices=["normalization", "portfolio_scaling"], default="normalization",
+        help="사용할 환경 Wrapper 종류"
     )
 
     # ======================
@@ -227,7 +237,7 @@ def parse_args():
     # =================================
     parser.add_argument(
         "--reward_strategy",
-        choices=["RealizedPnLReward", "LogPortfolioReturnReward", "CombinedReward"],
+        choices=["RealizedPnLReward", "LogPortfolioReturnReward", "CombinedReward", "ScaledRealizedPnLReward"],
         default="RealizedPnLReward",
         help="사용할 리워드 전략 클래스 이름"
     )
@@ -258,7 +268,10 @@ def make_env_from_df(df: pd.DataFrame, args) -> UnifiedTradingEnv:
         include_tech=args.include_tech,
         include_pnl=True,
         include_spread=False,
+        include_position = True,
+        include_orderbook = False,
         include_portfolio_value=args.include_portfolio_value,
+        include_cash=args.include_cash,
         tech_dim=len(df.columns) - 5  # or however you compute tech_dim
     )
 
@@ -343,9 +356,17 @@ def main(args):
     df_test  = df_all.iloc[n_train + n_val :]
 
     # now instantiate three envs from those splits
-    train_env = NormalizationWrapper(make_env_from_df(df_train, args))
-    eval_env  = NormalizationWrapper(make_env_from_df(df_val,   args))
-    test_env  = NormalizationWrapper(make_env_from_df(df_test,  args))
+    if args.wrapper == "portfolio_scaling":
+        if not args.include_portfolio_value:
+            print("경고: PortfolioScalingWrapper는 --include_portfolio_value 플래그가 필요합니다. 해당 플래그를 활성화합니다.")
+            args.include_portfolio_value = True
+        WrapperClass = PortfolioScalingWrapper
+    else:
+        WrapperClass = NormalizationWrapper
+
+    train_env = WrapperClass(make_env_from_df(df_train, args))
+    eval_env  = WrapperClass(make_env_from_df(df_val,   args))
+    test_env  = WrapperClass(make_env_from_df(df_test,  args))
 
 
     # 2) 로그 디렉토리

@@ -6,7 +6,7 @@ import sys
 # Add the project root to the Python path to allow for absolute imports
 # sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, ClippedActionStrategy
+from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, ScaledRealizedPnLReward, ClippedActionStrategy, PortfolioScalingWrapper, NormalizationWrapper
 from ..data_handler import FeatureEngineer
 
 def run_interactive_test():
@@ -17,8 +17,8 @@ def run_interactive_test():
     """
     # 1. Load data
     # Using a default CSV for this test.
-    csv_path = "src/db/AAPL_minute_ohlcv_orderbook_2019_01-07_combined.csv"
-    
+    # csv_path = "src/db/AAPL_minute_ohlcv_orderbook_2019_01-07_combined.csv"
+    csv_path = "src/db/AAPL_minute_ohlcv_2019_01-07_combined.csv"  # Alternative path if running from project root
     if not os.path.exists(csv_path):
         print(f"Error: Cannot find data file at '{csv_path}'")
         print("Please ensure you are running the script from the project root directory (e.g., C:\Github\DeepTradeRL).")
@@ -33,7 +33,7 @@ def run_interactive_test():
 
     # 2) FeatureEngineer로 전처리
     fe = FeatureEngineer(
-        use_technical_indicator=True,
+        use_technical_indicator=False,
         # tech_indicator_list=["rsi_14","macd","cci"],  # 예시
         use_turbulence=False,
         user_defined_feature=False
@@ -47,13 +47,26 @@ def run_interactive_test():
     try:
         env = UnifiedTradingEnv(
             df=test_df,
-            reward_strategy=RealizedPnLReward,
+            reward_strategy=ScaledRealizedPnLReward,
             action_strategy=ClippedActionStrategy,
             initial_cash=100000.0,
             transaction_fee=0.001,
             lookback=9,
-            h_max=250
+            lob_levels=0,
+            h_max=250,
+            hold_threshold=0.2,
+            include_ohlcv=True,
+            include_tech=False,
+            include_pnl=True,
+            include_spread=False,
+            include_position = True,
+            include_orderbook = False,
+            include_portfolio_value = True,
+            include_cash= True,
+            tech_dim=0
         )
+        # env = NormalizationWrapper(env)  # 필요시 정규화 래퍼 적용
+        env = PortfolioScalingWrapper(env)  # 필요시 포트폴리오 가치 스케일링 래퍼 적용
     except Exception as e:
         print(f"Error initializing environment: {e}")
         print("This might be due to changes in the environment's __init__ method.")
@@ -94,6 +107,7 @@ def run_interactive_test():
 
         # Print step results
         print(f"\n--- Step {step_count} Result ---")
+        print(f"obs: {obs}  ")
         print(f"Reward: {reward:.6f}")
         print(f"Info: {info}")
         

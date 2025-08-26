@@ -81,3 +81,23 @@ class CombinedReward(RewardStrategy):
         log_strat.prev_portfolio_value = self.prev_portfolio_value
         r2 = log_strat.compute(tx, current_portfolio_value)
         return r1 + r2
+
+class ScaledRealizedPnLReward(RewardStrategy):
+    """
+    RealizedPnLReward와 유사하지만, 보상을 포트폴리오 가치로 나눕니다.
+    보상 = (실현 손익 - 수수료) / 포트폴리오 가치
+    """
+    def compute(self, tx: TransactionInfo, current_portfolio_value: float) -> float:
+        # 매도(sell) 거래가 아니면 보상을 0으로 설정
+        if tx is None or tx.trade_type == TradeType.BUY:
+            return 0.0
+        
+        # 0으로 나누기 방지
+        if current_portfolio_value <= 1e-9:
+            return 0.0
+
+        # 매도 거래일 경우, 실현 손익에서 수수료를 뺀 값을 보상으로 제공
+        fee = abs(tx.quantity) * tx.price * self.transaction_fee
+        realized_pnl = tx.realized_pnl - fee
+        
+        return realized_pnl / current_portfolio_value

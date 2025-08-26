@@ -3,7 +3,7 @@ from pathlib import Path
 
 from gymnasium import spaces
 
-from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy, NormalizationWrapper
+from ..trading_env import UnifiedTradingEnv, RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy, NormalizationWrapper, PortfolioScalingWrapper
 from ..data_handler import FeatureEngineer
 
 def test_unified_env_initialization():
@@ -34,15 +34,20 @@ def test_unified_env_initialization():
         transaction_fee=0.0023,
         lookback=9,
         lob_levels=0,
-        h_max=1,
+        h_max=250,
         hold_threshold=0.2,
         include_ohlcv=True,
         include_tech=False,
         include_pnl=True,
         include_spread=False,
+        include_position = True,
+        include_orderbook = False,
+        include_portfolio_value = True,
+        include_cash= True,
         tech_dim=0
     )
-    env = NormalizationWrapper(env)  # 필요시 정규화 래퍼 적용
+    # env = NormalizationWrapper(env)  # 필요시 정규화 래퍼 적용
+    env = PortfolioScalingWrapper(env)  # 필요시 포트폴리오 가치 스케일링 래퍼 적용
 
     # 4) observation / action_space 타입 검사
     obs, info = env.reset()

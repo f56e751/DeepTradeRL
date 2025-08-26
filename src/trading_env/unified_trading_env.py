@@ -31,12 +31,12 @@ class UnifiedTradingEnv(gym.Env):
                 include_position: Optional[bool] = True,
                 include_orderbook: Optional[bool] = True,
                 include_portfolio_value: Optional[bool] = True,
+                include_cash: bool = False,
                 tech_dim: Optional[int] = 0
                 ):
         
         super().__init__()
         self.df = df.drop(columns=['timestamp', 'tic']).reset_index(drop=True)
-        print("hihi")
         print(self.df)
         self.h_max = h_max
         self.hold_threshold = hold_threshold
@@ -52,6 +52,7 @@ class UnifiedTradingEnv(gym.Env):
         self.include_spread = include_spread
         self.include_position = include_position
         self.include_portfolio_value = include_portfolio_value
+        self.include_cash = include_cash
         # self.include_orderbook = include_orderbook
 
 
@@ -72,6 +73,8 @@ class UnifiedTradingEnv(gym.Env):
 
         # handler 생성
         inst_keys=['pnl','position']
+        if self.include_cash:
+            inst_keys.append('cash')
         if self.include_portfolio_value:
             inst_keys.append('portfolio_value')
         # Observation 생성
@@ -93,20 +96,30 @@ class UnifiedTradingEnv(gym.Env):
 
         # 2) 포함 옵션에 따라 추가 차원 계산
         obs_dim = num_df_feats * lookback
+        print("--- 관측 공간(Observation Space) 차원 계산 ---")
+        print(f"  - 기본 (df 피처 수 * lookback): {num_df_feats} * {lookback} = {num_df_feats * lookback}")
+
         # if include_ohlcv:
         #     obs_dim += 5 * lookback           # [open, high, low, close, volume]
         if include_pnl:
             obs_dim += 1           # PnL
+            print("  - PnL: +1")
         if include_spread:
             obs_dim += 1           # bid-ask spread
+            print("  - Spread: +1")
         if include_position:
             obs_dim += 1           # 포지션 정보
+            print("  - Position: +1")
+        if self.include_cash:
+            obs_dim += 1           # 현금 정보
+            print("  - Cash: +1")
         if self.include_portfolio_value:
             obs_dim += 1           # 포트폴리오 가치
-
-        print("===========================")
-        print(obs_dim)
-        print("===========================")
+            print("  - Portfolio Value: +1")
+        
+        print("-------------------------------------------")
+        print(f"  >>> 총 관측 차원(obs_dim): {obs_dim}")
+        print("-------------------------------------------")
         # 3) action_space, observation_space 설정
         self.action_space = spaces.Box(
             low=-1.0, high=1.0, shape=(1,), dtype=np.float32
@@ -116,6 +129,7 @@ class UnifiedTradingEnv(gym.Env):
         )
         # 필요시 멤버로도 저장
         self.obs_dim = obs_dim
+        self.lookback = lookback
 
 
     def reset(self, seed=None, options=None):
@@ -165,6 +179,9 @@ class UnifiedTradingEnv(gym.Env):
             pos = int(np.sign(self.inventory.get_position("TICKER")))
             data['position'] = [pos]
         
+        # — 보유 현금
+        if self.include_cash:
+            data['cash'] = [self.inventory.get_cash()]
 
         # — 미실현 PnL
         if self.include_pnl:
