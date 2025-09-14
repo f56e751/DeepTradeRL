@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -1066,7 +1067,8 @@ def compare_performance(val_results, test_results, save_directory):
 
 def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100000, save_directory=None):
     """
-    Enhanced evaluation with comprehensive financial metrics and action analysis
+    Enhanced evaluation with comprehensive financial metrics and action analysis.
+    Also logs detailed step-by-step trading data to a CSV file.
     """
     print(f"\n📈 Enhanced Evaluation on {dataset_name} Dataset")
     print("-" * 50)
@@ -1083,6 +1085,10 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
     
     for episode in range(num_episodes):
         obs, info = env.reset()
+        
+        # --- 로깅을 위한 리스트 초기화 ---
+        log_data = []
+        
         episode_reward = 0
         episode_step_rewards = []
         episode_cumulative_rewards = []
@@ -1093,35 +1099,61 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         
         print(f"Episode {episode + 1}/{num_episodes} - {dataset_name}")
         
-        # 초기 포트폴리오 가치 기록
-        mid_price = env.get_price()
-        initial_portfolio_value = env.inventory.get_portfolio_value({'TICKER': mid_price})
-        episode_portfolio_values.append(initial_portfolio_value)
+        # 초기 포트폴리오 가치 및 상태 기록
+        price = env.get_price()
+        portfolio_value = env.inventory.get_portfolio_value({'TICKER': price})
+        cash = env.inventory.get_cash()
+        position = env.inventory.get_position('TICKER')
+        unrealized_pnl = env.inventory.get_unrealized_pnl({'TICKER': price})
         
-        # Use tqdm for progress bar
+        # 첫 스텝 (초기 상태) 로그 추가
+        log_data.append({
+            "step": 0,
+            "price": price,
+            "portfolio_value": portfolio_value,
+            "cash": cash,
+            "position": position,
+            "action": 0.0,  # 시작 시점엔 액션 없음
+            "reward": 0.0,  # 시작 시점엔 보상 없음
+            "unrealized_pnl": unrealized_pnl
+        })
+        
+        episode_portfolio_values.append(portfolio_value)
+        
         pbar = tqdm(desc=f"Steps", unit="step")
         
         while not done:
-            # Use the model to predict the next action (evaluation mode)
             action, _states = model.predict(obs, deterministic=True)
-            
-            # Record raw action for analysis
             raw_action = float(action[0]) if hasattr(action, '__len__') else float(action)
             episode_actions.append(raw_action)
             
-            # Take the action in the environment
             obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
             
-            # Record step rewards
             episode_step_rewards.append(reward)
             episode_reward += reward
             episode_cumulative_rewards.append(episode_reward)
             
-            # Record actual portfolio value using mid price
-            mid_price = env.get_price()
-            portfolio_value = env.inventory.get_portfolio_value({'TICKER': mid_price})
+            # 현재 스텝의 환경 정보 가져오기
+            price = env.get_price()
+            portfolio_value = env.inventory.get_portfolio_value({'TICKER': price})
+            cash = env.inventory.get_cash()
+            position = env.inventory.get_position('TICKER')
+            unrealized_pnl = env.inventory.get_unrealized_pnl({'TICKER': price})
+            
             episode_portfolio_values.append(portfolio_value)
+            
+            # --- 현재 스텝 정보 로깅 ---
+            log_data.append({
+                "step": step + 1,
+                "price": price,
+                "portfolio_value": portfolio_value,
+                "cash": cash,
+                "position": position,
+                "action": raw_action,
+                "reward": reward,
+                "unrealized_pnl": unrealized_pnl
+            })
             
             step += 1
             pbar.update(1)
@@ -1138,7 +1170,7 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         all_step_rewards.append(episode_step_rewards)
         all_cumulative_rewards.append(episode_cumulative_rewards)
         all_portfolio_values.append(episode_portfolio_values)
-        all_actions.extend(episode_actions)  # Flatten all actions
+        all_actions.extend(episode_actions)
         
         final_portfolio_value = episode_portfolio_values[-1]
         portfolio_return = (final_portfolio_value - initial_cash) / initial_cash
@@ -1148,7 +1180,15 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         print(f"   Portfolio value: ${final_portfolio_value:,.2f}")
         print(f"   Portfolio return: {portfolio_return:.2%}")
         print(f"   Total actions taken: {len(episode_actions)}")
-    
+
+        # --- CSV 파일로 저장 ---
+        if save_directory:
+            log_df = pd.DataFrame(log_data)
+            log_filename = f'test_step_log.csv'
+            log_path = os.path.join('runs', save_directory, log_filename)
+            log_df.to_csv(log_path, index=False)
+            print(f"💾 Detailed evaluation log saved to '{log_path}'")
+
     # Calculate action statistics
     print(f"\n🎯 Calculating action distribution...")
     action_stats = calculate_action_statistics(all_actions, hold_threshold, h_max)
@@ -1168,7 +1208,6 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
     cumulative_rewards = all_cumulative_rewards[0]
     portfolio_values = all_portfolio_values[0]
     
-    # Calculate metrics with actual portfolio values
     metrics = calculate_financial_metrics(step_rewards, cumulative_rewards, portfolio_values, initial_cash)
     
     if metrics:
@@ -1212,7 +1251,6 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         print(f"   Skewness: {metrics['skewness']:.4f}")
         print(f"   Kurtosis: {metrics['kurtosis']:.4f}")
         
-        # Performance interpretation
         print(f"\n💡 Performance Interpretation:")
         if metrics['sharpe_ratio'] > 1.0:
             print("   ✅ Excellent risk-adjusted performance (Sharpe > 1.0)")
@@ -1231,10 +1269,8 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         else:
             print("   ⚠️  Low win rate - strategy may rely on few large wins")
     
-    # Also create the original visualization
     plot_reward_curves(all_step_rewards, all_cumulative_rewards, num_episodes, dataset_name, save_directory)
     
-    # Print evaluation summary
     avg_reward = np.mean(all_episode_rewards)
     std_reward = np.std(all_episode_rewards)
     
@@ -1252,5 +1288,5 @@ def evaluate_model(model, env, num_episodes=1, dataset_name="", initial_cash=100
         'avg_reward': avg_reward,
         'std_reward': std_reward,
         'financial_metrics': metrics,
-        'action_stats': action_stats  # 추가: 행동 통계
+        'action_stats': action_stats
     }

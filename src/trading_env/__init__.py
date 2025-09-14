@@ -11,4 +11,4 @@ from .unified_trading_env import UnifiedTradingEnv
 from .transaction_info import TransactionInfo, TradeType
 from .rewards import RealizedPnLReward, LogPortfolioReturnReward, CombinedReward, ScaledRealizedPnLReward
 from .actions import ActionStrategy, TestActionStrategy, ClippedActionStrategy, PercentPortfolioStrategy, StrictActionStrategy, FloatClippedActionStrategy
-from .wrapper import NormalizationWrapper, PortfolioScalingWrapper
+from .wrapper import NormalizationWrapper, PortfolioScalingWrapper, ReshapeObservationWrapper
