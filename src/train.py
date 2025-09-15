@@ -248,6 +248,14 @@ def parse_args():
         help="사용할 액션 전략 클래스 이름"
     )
 
+    # ======================
+    # 12) price hint
+    # ======================
+    parser.add_argument(
+        "--price_hint", action="store_true",
+        help="관측값에 다음 스텝의 가격 힌트 포함 여부 (디버깅용)"
+    )
+
     return parser.parse_args()
 
 def make_env_from_df(df: pd.DataFrame, args) -> UnifiedTradingEnv:
@@ -272,7 +280,8 @@ def make_env_from_df(df: pd.DataFrame, args) -> UnifiedTradingEnv:
         include_orderbook = False,
         include_portfolio_value=args.include_portfolio_value,
         include_cash=args.include_cash,
-        tech_dim=len(df.columns) - 5  # or however you compute tech_dim
+        tech_dim=len(df.columns) - 5,  # or however you compute tech_dim
+        price_hint=args.price_hint
     )
 
 # def make_env(args):

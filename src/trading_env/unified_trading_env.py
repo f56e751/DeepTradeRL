@@ -32,7 +32,8 @@ class UnifiedTradingEnv(gym.Env):
                 include_orderbook: Optional[bool] = True,
                 include_portfolio_value: Optional[bool] = True,
                 include_cash: bool = False,
-                tech_dim: Optional[int] = 0
+                tech_dim: Optional[int] = 0,
+                price_hint: bool = False,
                 ):
         
         super().__init__()
@@ -54,6 +55,7 @@ class UnifiedTradingEnv(gym.Env):
         self.include_portfolio_value = include_portfolio_value
         self.include_cash = include_cash
         # self.include_orderbook = include_orderbook
+        self.price_hint = price_hint
 
 
 
@@ -77,6 +79,9 @@ class UnifiedTradingEnv(gym.Env):
             inst_keys.append('cash')
         if self.include_portfolio_value:
             inst_keys.append('portfolio_value')
+        if self.price_hint:
+            inst_keys.append('price_hint')
+
         # Observation 생성
         self.observation_buffer = ObservationBuffer(
             lookback=lookback,
@@ -116,6 +121,9 @@ class UnifiedTradingEnv(gym.Env):
         if self.include_portfolio_value:
             obs_dim += 1           # 포트폴리오 가치
             print("  - Portfolio Value: +1")
+        if self.price_hint:
+            obs_dim += 1           # 현재 가격 힌트
+            print("  - Price Hint: +1")
         
         print("-------------------------------------------")
         print(f"  >>> 총 관측 차원(obs_dim): {obs_dim}")
@@ -159,6 +167,7 @@ class UnifiedTradingEnv(gym.Env):
     def _get_obs(self):
         # 1) 현재 행 가져오기
         row = self.df.iloc[self.current_step]
+        next_row = self.df.iloc[self.current_step + 1] if self.current_step + 1 < self.max_steps else row
 
         # 2) 피처 리스트 조립
         # feats = []
@@ -195,6 +204,20 @@ class UnifiedTradingEnv(gym.Env):
             price = float(row["close"])
             pf_val = self.inventory.get_portfolio_value({"TICKER": price})
             data['portfolio_value'] = [pf_val]
+
+        if self.price_hint:
+            current_price = float(row["close"])
+            next_price = float(next_row["close"])
+            price_diff_ratio = (next_price - current_price) / current_price
+            threshold = 0.02  # 2% 변동을 기준으로 힌트 제공
+            if price_diff_ratio > threshold:
+                price_hint = 1  # 가격 상승 힌트
+            elif price_diff_ratio < -threshold:
+                price_hint = -1  # 가격 하락 힌트
+            else:
+                price_hint = 0  # 가격 변화 없음
+            data['price_hint'] = [price_hint]
+
 
         self.observation_buffer.update(data)
         obs = self.observation_buffer.get_observation_vector()
