@@ -34,6 +34,7 @@ class UnifiedTradingEnv(gym.Env):
                 include_cash: bool = False,
                 tech_dim: Optional[int] = 0,
                 price_hint: bool = False,
+                price_hint_accuracy: float = 1.0,
                 ):
         
         super().__init__()
@@ -56,6 +57,7 @@ class UnifiedTradingEnv(gym.Env):
         self.include_cash = include_cash
         # self.include_orderbook = include_orderbook
         self.price_hint = price_hint
+        self.price_hint_accuracy = float(np.clip(price_hint_accuracy, 0.0, 1.0))
 
 
 
@@ -208,14 +210,30 @@ class UnifiedTradingEnv(gym.Env):
         if self.price_hint:
             current_price = float(row["close"])
             next_price = float(next_row["close"])
-            price_diff_ratio = (next_price - current_price) / current_price
-            threshold = 0.02  # 2% 변동을 기준으로 힌트 제공
+            price_diff_ratio = (next_price - current_price) / max(1e-12, current_price)
+            threshold = 0.02  # 2%
+
+            # 실제 정답 힌트(상승=+1, 하락=-1, 변화없음=0)
             if price_diff_ratio > threshold:
-                price_hint = 1  # 가격 상승 힌트
+                true_hint = 1
             elif price_diff_ratio < -threshold:
-                price_hint = -1  # 가격 하락 힌트
+                true_hint = -1
             else:
-                price_hint = 0  # 가격 변화 없음
+                true_hint = 0
+
+            # 난수 소스 선택
+            rng = getattr(self, "_np_random", None)
+            if rng is None:
+                rng = np.random
+
+            if true_hint == 0:
+                price_hint = 0
+            else:
+                # p 확률로 정답, (1-p) 확률로 반대 신호
+                p = self.price_hint_accuracy
+                flip = rng.random() >= p
+                price_hint = -true_hint if flip else true_hint
+
             data['price_hint'] = [price_hint]
 
 

@@ -256,6 +256,11 @@ def parse_args():
         help="관측값에 다음 스텝의 가격 힌트 포함 여부 (디버깅용)"
     )
 
+    parser.add_argument(
+        "--price_hint_accuracy", type=float, default=1.0,
+        help="price hint가 정답일 확률(0.0~1.0)"
+    )
+
     return parser.parse_args()
 
 def make_env_from_df(df: pd.DataFrame, args) -> UnifiedTradingEnv:
@@ -281,7 +286,8 @@ def make_env_from_df(df: pd.DataFrame, args) -> UnifiedTradingEnv:
         include_portfolio_value=args.include_portfolio_value,
         include_cash=args.include_cash,
         tech_dim=len(df.columns) - 5,  # or however you compute tech_dim
-        price_hint=args.price_hint
+        price_hint=args.price_hint,
+        price_hint_accuracy=args.price_hint_accuracy,
     )
 
 # def make_env(args):
