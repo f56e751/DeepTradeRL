@@ -49,4 +49,5 @@ ENV/
 Thumbs.db
 
 # Project specific
-runs/ 
+runs/
+predictor_runs/
